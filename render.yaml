@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: academic-paper-studio
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python web_downloader/app.py
+    plan: free

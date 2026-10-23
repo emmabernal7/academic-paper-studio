@@ -14,7 +14,7 @@ from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 
 from downloader_core import process_batch
 
-PORT = 8765
+PORT = int(os.environ.get("PORT", 8765))
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 DOWNLOADS_DIR = os.path.join(BASE_DIR, "downloads")
