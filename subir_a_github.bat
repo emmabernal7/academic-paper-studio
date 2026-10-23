@@ -8,7 +8,7 @@ echo   Repositorio: emmabernal7/academic-paper-studio
 echo =======================================================
 echo.
 
-git push -u origin main
+git push -u origin main --force
 
 if %ERRORLEVEL% EQU 0 (
     echo.
