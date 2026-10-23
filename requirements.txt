@@ -1,0 +1,7 @@
+habanero>=2.4.0
+pyzotero>=1.16.0
+scholarly>=1.7.11
+PyPaperBot>=1.4.1
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+bibtexparser<2.0.0

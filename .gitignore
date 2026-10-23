@@ -1,0 +1,21 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Environment variables & secrets
+.env
+*.env
+
+# Web downloader downloaded papers & caches
+web_downloader/downloads/*
+!web_downloader/downloads/.gitkeep
+
+# Operating System files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Academic Paper Studio | Descargador & Metadatos de DOIs</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.4); border-radius: 4px; }
+    .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; }
+  </style>
+</head>
+<body class="h-full flex flex-col bg-slate-100 text-slate-800 dark:bg-slate-950 dark:text-slate-100 transition-colors duration-200 antialiased selection:bg-indigo-500 selection:text-white">
+
+  <!-- TOP NAVBAR -->
+  <header class="border-b border-slate-200 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/70 backdrop-blur-md sticky top-0 z-40 px-6 py-3 flex items-center justify-between">
+    <div class="flex items-center space-x-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-indigo-500/20 text-white font-bold text-xl">
+        ⚗️
+      </div>
+      <div>
+        <div class="flex items-center space-x-2">
+          <h1 class="text-base font-bold tracking-tight text-slate-900 dark:text-white">Academic Paper Studio</h1>
+          <span class="text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">Toolkit v2.1</span>
+        </div>
+        <p class="text-xs text-slate-500 dark:text-slate-400" data-i18n="navbar_subtitle">Crossref • Sci-Hub • BibTeX • RIS • EndNote • Zotero</p>
+      </div>
+    </div>
+    
+    <div class="flex items-center space-x-2.5">
+      <!-- LANGUAGE SWITCHER BUTTON -->
+      <button onclick="toggleLanguage()" id="langToggleBtn" class="px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition shadow-sm flex items-center gap-1.5 text-xs font-bold" title="Cambiar idioma / Switch language">
+        <span>🌐</span>
+        <span id="langLabel">ES</span>
+      </button>
+
+      <!-- THEME TOGGLE BUTTON -->
+      <button onclick="toggleTheme()" id="themeToggleBtn" class="p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition shadow-sm flex items-center gap-1.5 text-xs font-medium" title="Cambiar tema (Claro / Oscuro)">
+        <span id="themeIcon">☀️</span>
+        <span id="themeText" class="hidden sm:inline" data-i18n="theme_light">Modo Claro</span>
+      </button>
+
+      <span class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span data-i18n="port_active">Puerto 8765 Activo</span>
+      </span>
+    </div>
+  </header>
+
+  <!-- MAIN CONTENT -->
+  <main class="flex-1 max-w-[1600px] w-full mx-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+    <!-- LEFT COLUMN: INPUTS & SETTINGS (5 Cols) -->
+    <div class="lg:col-span-5 space-y-5">
+      
+      <!-- CARD: DOI INPUT -->
+      <div class="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm dark:shadow-xl transition-colors">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center space-x-2">
+            <span class="text-indigo-500 text-lg">📄</span>
+            <h2 class="text-sm font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200" data-i18n="doi_title">Lista de DOIs</h2>
+          </div>
+          <div class="flex items-center space-x-2">
+            <button onclick="loadSampleDOIs()" class="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline" data-i18n="load_sample">
+              Cargar Ejemplo
+            </button>
+            <span class="text-slate-300 dark:text-slate-700">|</span>
+            <button onclick="clearDOIs()" class="text-xs font-medium text-slate-400 hover:text-rose-500 hover:underline" data-i18n="clear">
+              Limpiar
+            </button>
+          </div>
+        </div>
+
+        <p class="text-xs text-slate-500 dark:text-slate-400 mb-2" data-i18n="doi_instruction">Pega tus DOIs o URLs de artículos (uno por línea o separados por comas):</p>
+        
+        <!-- TEXTAREA LIMPIO (SOLO: Escribe tu DOI aqui) -->
+        <textarea id="doiInput" rows="6" placeholder="Escribe tu DOI aqui" data-i18n-placeholder="doi_placeholder"
+          class="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 text-xs text-slate-800 dark:text-slate-200 font-mono focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition custom-scrollbar"></textarea>
+
+        <!-- Drag and Drop Box -->
+        <div id="dropZone" class="mt-3 border-2 border-dashed border-slate-200 dark:border-slate-800 hover:border-indigo-400 dark:hover:border-slate-700 rounded-xl p-3 text-center cursor-pointer transition bg-slate-50/50 dark:bg-slate-950/40">
+          <input type="file" id="fileInput" accept=".txt,.csv" class="hidden" onchange="handleFileSelect(event)">
+          <div onclick="document.getElementById('fileInput').click()" class="flex items-center justify-center space-x-2 text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
+            <span>📁</span>
+            <span data-i18n="dropzone_text">Arrastra o sube un archivo <strong>.txt</strong> o <strong>.csv</strong> con DOIs</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- CARD: OPTIONS ACCORDION -->
+      <div class="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm dark:shadow-xl space-y-4 transition-colors">
+        <div class="flex items-center space-x-2 pb-2 border-b border-slate-200 dark:border-slate-800">
+          <span class="text-indigo-500 text-lg">⚙️</span>
+          <h2 class="text-sm font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200" data-i18n="config_title">Configuración de Descarga</h2>
+        </div>
+
+        <!-- Renaming options -->
+        <div>
+          <label class="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5" data-i18n="pdf_format_label">Formato de nombre del PDF:</label>
+          <div class="grid grid-cols-2 gap-2">
+            <label class="flex items-center space-x-2 bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl cursor-pointer hover:border-indigo-400 dark:hover:border-slate-700">
+              <input type="radio" name="renameMode" value="readable" checked class="text-indigo-600 focus:ring-indigo-500">
+              <span class="text-xs text-slate-700 dark:text-slate-300" data-i18n="pdf_format_readable">Año_Autor_Título.pdf</span>
+            </label>
+            <label class="flex items-center space-x-2 bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl cursor-pointer hover:border-indigo-400 dark:hover:border-slate-700">
+              <input type="radio" name="renameMode" value="doi" class="text-indigo-600 focus:ring-indigo-500">
+              <span class="text-xs text-slate-700 dark:text-slate-300" data-i18n="pdf_format_doi">DOI_Limpio.pdf</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Sci-Hub Mirrors -->
+        <div>
+          <label class="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5" data-i18n="mirror_label">Mirror de Sci-Hub preferido:</label>
+          <select id="mirrorSelect" class="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-indigo-500">
+            <option value="auto" data-i18n="mirror_auto">Automático (Prueba .ru, .st, .se en cascada)</option>
+            <option value="https://sci-hub.ru" data-i18n="mirror_ru">sci-hub.ru (Más estable)</option>
+            <option value="https://sci-hub.st">sci-hub.st</option>
+            <option value="https://sci-hub.se">sci-hub.se</option>
+          </select>
+        </div>
+
+        <!-- Zotero Sync Toggle -->
+        <div class="pt-2 border-t border-slate-200 dark:border-slate-800/80">
+          <label class="flex items-center justify-between cursor-pointer">
+            <span class="text-xs font-medium text-slate-700 dark:text-slate-300" data-i18n="zotero_toggle">Sincronizar automáticamente con Zotero</span>
+            <input type="checkbox" id="zoteroToggle" onchange="toggleZoteroFields()" class="w-4 h-4 rounded text-indigo-600 bg-slate-100 dark:bg-slate-950 border-slate-300 dark:border-slate-700 focus:ring-indigo-500">
+          </label>
+          
+          <div id="zoteroFields" class="hidden mt-3 space-y-2.5 bg-slate-50 dark:bg-slate-950/60 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
+            <div>
+              <label class="block text-[11px] text-slate-500 dark:text-slate-400 mb-1" data-i18n="zotero_id_label">Zotero User ID / Group ID:</label>
+              <input type="text" id="zoteroId" placeholder="Ej: 1234567" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-xs text-slate-800 dark:text-slate-200">
+            </div>
+            <div>
+              <label class="block text-[11px] text-slate-500 dark:text-slate-400 mb-1" data-i18n="zotero_key_label">Zotero API Key:</label>
+              <input type="password" id="zoteroKey" placeholder="Tu API Key secreta de Zotero" data-i18n-placeholder="zotero_key_placeholder" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-xs text-slate-800 dark:text-slate-200">
+            </div>
+          </div>
+        </div>
+
+        <!-- ACTION BUTTON -->
+        <button id="btnProcess" onclick="startProcessing()" class="w-full mt-2 py-3.5 px-4 bg-gradient-to-r from-indigo-600 hover:from-indigo-500 to-cyan-500 hover:to-cyan-400 text-white font-bold text-sm rounded-xl shadow-lg shadow-indigo-600/20 transition flex items-center justify-center space-x-2">
+          <span id="btnIcon">🚀</span>
+          <span id="btnText" data-i18n="btn_start">Iniciar Descarga y Extracción</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- RIGHT COLUMN: RESULTS & PROGRESS (7 Cols) -->
+    <div class="lg:col-span-7 space-y-5">
+      
+      <!-- STATS BAR -->
+      <div class="grid grid-cols-4 gap-3">
+        <div class="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 p-3.5 rounded-xl text-center shadow-sm">
+          <div class="text-[11px] font-semibold uppercase text-slate-400" data-i18n="stat_total">Total DOIs</div>
+          <div id="statTotal" class="text-xl font-bold text-slate-900 dark:text-white mt-0.5">0</div>
+        </div>
+        <div class="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 p-3.5 rounded-xl text-center shadow-sm">
+          <div class="text-[11px] font-semibold uppercase text-emerald-500 dark:text-emerald-400" data-i18n="stat_downloaded">Descargados</div>
+          <div id="statSuccess" class="text-xl font-bold text-emerald-500 dark:text-emerald-400 mt-0.5">0</div>
+        </div>
+        <div class="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 p-3.5 rounded-xl text-center shadow-sm">
+          <div class="text-[11px] font-semibold uppercase text-rose-500 dark:text-rose-400" data-i18n="stat_not_found">No Encontrados</div>
+          <div id="statFailed" class="text-xl font-bold text-rose-500 dark:text-rose-400 mt-0.5">0</div>
+        </div>
+        <div class="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 p-3.5 rounded-xl text-center shadow-sm">
+          <div class="text-[11px] font-semibold uppercase text-cyan-600 dark:text-cyan-400" data-i18n="stat_citations">Citas Totales</div>
+          <div id="statCites" class="text-xl font-bold text-cyan-600 dark:text-cyan-400 mt-0.5">0</div>
+        </div>
+      </div>
+
+      <!-- PROGRESS STATUS BANNER -->
+      <div id="progressContainer" class="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm dark:shadow-xl">
+        <div class="flex items-center justify-between text-xs mb-2">
+          <span id="progressMessage" class="text-slate-600 dark:text-slate-300 font-medium" data-i18n="waiting_list">Esperando lista de artículos...</span>
+          <span id="progressPercent" class="text-indigo-600 dark:text-indigo-400 font-mono font-bold">0%</span>
+        </div>
+        <div class="w-full bg-slate-100 dark:bg-slate-950 rounded-full h-2.5 overflow-hidden">
+          <div id="progressBar" class="bg-gradient-to-r from-indigo-500 to-cyan-400 h-2.5 rounded-full transition-all duration-300 w-0"></div>
+        </div>
+      </div>
+
+      <!-- FORMAT SELECTOR & EXPORT BAR -->
+      <div class="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm dark:shadow-xl space-y-3">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <span class="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1" data-i18n="format_active_label">Formato de Citas activo:</span>
+            <!-- Segmented button for BibTeX / RIS / EndNote -->
+            <div class="inline-flex rounded-xl bg-slate-100 dark:bg-slate-950 p-1 border border-slate-200 dark:border-slate-800">
+              <button onclick="setActiveFormat('bib')" id="btnFormatBib" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white shadow transition">
+                BibTeX (.bib)
+              </button>
+              <button onclick="setActiveFormat('ris')" id="btnFormatRis" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-white transition">
+                RIS (.ris / Mendeley / Zotero)
+              </button>
+              <button onclick="setActiveFormat('enw')" id="btnFormatEnw" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-white transition">
+                EndNote (.enw)
+              </button>
+            </div>
+          </div>
+
+          <!-- BATCH EXPORT BUTTONS (Visible when results ready) -->
+          <div id="exportActionButtons" class="hidden flex flex-wrap items-center gap-2 pt-1">
+            <a id="btnZip" href="/downloads/AcademicPapers_Bundle.zip" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs rounded-xl shadow transition flex items-center space-x-1.5">
+              <span>📦</span>
+              <span data-i18n="btn_download_zip">Descargar Todo (ZIP)</span>
+            </a>
+            <a id="btnDownloadFormatFile" href="/downloads/references.bib" download="references.bib" class="px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs rounded-xl border border-slate-200 dark:border-slate-700 transition flex items-center space-x-1">
+              <span>⬇️</span>
+              <span id="btnFormatFileLabel">Descargar .bib</span>
+            </a>
+            <button onclick="copyAllCitations()" class="px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs rounded-xl border border-slate-200 dark:border-slate-700 transition flex items-center space-x-1">
+              <span>📋</span>
+              <span data-i18n="btn_copy_citations">Copiar Citas</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- RESULTS TABLE CARD -->
+      <div class="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm dark:shadow-xl overflow-hidden transition-colors">
+        <div class="px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+          <div class="flex items-center space-x-2">
+            <span class="text-indigo-500">📊</span>
+            <h2 class="text-sm font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200" data-i18n="table_title">Resultados del Lote</h2>
+          </div>
+          <span id="resultsCount" class="text-xs text-slate-400">0 artículos procesados</span>
+        </div>
+
+        <div class="overflow-x-auto max-h-[550px] custom-scrollbar">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50 dark:bg-slate-950/80 text-slate-500 dark:text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800 sticky top-0">
+              <tr>
+                <th class="px-4 py-3" data-i18n="th_status">Estado</th>
+                <th class="px-4 py-3" data-i18n="th_title">Título & Revista</th>
+                <th class="px-3 py-3 text-center" data-i18n="th_year">Año</th>
+                <th class="px-3 py-3 text-center" data-i18n="th_citations">Citas</th>
+                <th class="px-4 py-3" data-i18n="th_source">Fuente</th>
+                <th class="px-4 py-3 text-right" data-i18n="th_actions">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="resultsTableBody" class="divide-y divide-slate-200 dark:divide-slate-800/60">
+              <tr id="emptyRow">
+                <td colspan="6" class="px-6 py-12 text-center text-slate-400 dark:text-slate-500">
+                  <div class="text-3xl mb-2">📚</div>
+                  <p class="font-medium" data-i18n="empty_title">Aún no has procesado artículos.</p>
+                  <p class="text-[11px] text-slate-400 dark:text-slate-600 mt-0.5" data-i18n="empty_desc">Pega los DOIs en el panel izquierdo y haz clic en Iniciar.</p>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- MODAL FOR CITATION PREVIEW (BIBTEX / RIS / ENDNOTE) -->
+  <div id="citationModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 dark:bg-black/80 backdrop-blur-sm p-4">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+        <div class="flex items-center space-x-2">
+          <span class="text-indigo-500">📄</span>
+          <h3 class="text-sm font-bold text-slate-900 dark:text-white" id="modalTitle">Cita Bibliográfica</h3>
+        </div>
+        <button onclick="closeCitationModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-white text-xl font-bold">&times;</button>
+      </div>
+
+      <!-- Modal Tabs to switch format inside modal -->
+      <div class="flex items-center space-x-2 border-b border-slate-200 dark:border-slate-800 pb-2">
+        <button onclick="switchModalFormat('bib')" id="modalTabBib" class="px-3 py-1 rounded-lg text-xs font-semibold bg-indigo-600 text-white">BibTeX</button>
+        <button onclick="switchModalFormat('ris')" id="modalTabRis" class="px-3 py-1 rounded-lg text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-indigo-600">RIS (Mendeley/Zotero)</button>
+        <button onclick="switchModalFormat('enw')" id="modalTabEnw" class="px-3 py-1 rounded-lg text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-indigo-600">EndNote (.enw)</button>
+      </div>
+
+      <pre id="citationModalContent" class="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl text-xs text-indigo-700 dark:text-indigo-300 font-mono overflow-x-auto max-h-72 custom-scrollbar border border-slate-200 dark:border-slate-800/80"></pre>
+
+      <div class="flex justify-end space-x-2 pt-2">
+        <button onclick="copyModalCitation()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow transition" data-i18n="btn_copy_clipboard">
+          Copiar al Portapapeles
+        </button>
+        <button onclick="closeCitationModal()" class="px-4 py-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition" data-i18n="btn_close">
+          Cerrar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT LOGIC -->
+  <script>
+    // --- I18N DICTIONARY ---
+    const I18N = {
+      es: {
+        navbar_subtitle: "Crossref • Sci-Hub • BibTeX • RIS • EndNote • Zotero",
+        port_active: "Puerto 8765 Activo",
+        theme_light: "Modo Claro",
+        theme_dark: "Modo Oscuro",
+        doi_title: "Lista de DOIs",
+        load_sample: "Cargar Ejemplo",
+        clear: "Limpiar",
+        doi_instruction: "Pega tus DOIs o URLs de artículos (uno por línea o separados por comas):",
+        doi_placeholder: "Escribe tu DOI aqui",
+        dropzone_text: "Arrastra o sube un archivo <strong>.txt</strong> o <strong>.csv</strong> con DOIs",
+        config_title: "Configuración de Descarga",
+        pdf_format_label: "Formato de nombre del PDF:",
+        pdf_format_readable: "Año_Autor_Título.pdf",
+        pdf_format_doi: "DOI_Limpio.pdf",
+        mirror_label: "Mirror de Sci-Hub preferido:",
+        mirror_auto: "Automático (Prueba .ru, .st, .se en cascada)",
+        mirror_ru: "sci-hub.ru (Más estable)",
+        zotero_toggle: "Sincronizar automáticamente con Zotero",
+        zotero_id_label: "Zotero User ID / Group ID:",
+        zotero_key_label: "Zotero API Key:",
+        zotero_key_placeholder: "Tu API Key secreta de Zotero",
+        btn_start: "Iniciar Descarga y Extracción",
+        btn_processing: "Procesando Artículos...",
+        stat_total: "Total DOIs",
+        stat_downloaded: "Descargados",
+        stat_not_found: "No Encontrados",
+        stat_citations: "Citas Totales",
+        waiting_list: "Esperando lista de artículos...",
+        format_active_label: "Formato de Citas activo:",
+        btn_download_zip: "Descargar Todo (ZIP)",
+        btn_copy_citations: "Copiar Citas",
+        table_title: "Resultados del Lote",
+        results_count_zero: "0 artículos procesados",
+        results_count_plural: "artículos procesados",
+        th_status: "Estado",
+        th_title: "Título & Revista",
+        th_year: "Año",
+        th_citations: "Citas",
+        th_source: "Fuente",
+        th_actions: "Acciones",
+        empty_title: "Aún no has procesado artículos.",
+        empty_desc: "Pega los DOIs en el panel izquierdo y haz clic en Iniciar.",
+        status_downloaded: "🟢 Descargado",
+        status_searching: "🟡 Buscando...",
+        status_unavailable: "🔴 No disponible",
+        unknown_journal: "Revista desconocida",
+        btn_cite: "Cita",
+        modal_cite_title_bib: "Cita en Formato BibTeX (.bib)",
+        modal_cite_title_ris: "Cita en Formato RIS (.ris)",
+        modal_cite_title_enw: "Cita en Formato EndNote (.enw)",
+        btn_copy_clipboard: "Copiar al Portapapeles",
+        btn_close: "Cerrar",
+        alert_copied: "¡Cita copiada al portapapeles!",
+        alert_all_copied: "¡Todas las citas en formato {fmt} han sido copiadas al portapapeles!",
+        alert_no_dois: "Por favor ingresa al menos un DOI.",
+        alert_invalid_dois: "No se detectaron DOIs válidos.",
+        alert_no_citations: "No hay citas generadas aún."
+      },
+      en: {
+        navbar_subtitle: "Crossref • Sci-Hub • BibTeX • RIS • EndNote • Zotero",
+        port_active: "Port 8765 Active",
+        theme_light: "Light Mode",
+        theme_dark: "Dark Mode",
+        doi_title: "DOI List",
+        load_sample: "Load Sample",
+        clear: "Clear",
+        doi_instruction: "Paste your DOIs or article URLs (one per line or comma-separated):",
+        doi_placeholder: "Enter your DOI here",
+        dropzone_text: "Drag & drop or upload a <strong>.txt</strong> or <strong>.csv</strong> file with DOIs",
+        config_title: "Download Settings",
+        pdf_format_label: "PDF filename format:",
+        pdf_format_readable: "Year_Author_Title.pdf",
+        pdf_format_doi: "Clean_DOI.pdf",
+        mirror_label: "Preferred Sci-Hub Mirror:",
+        mirror_auto: "Automatic (Tests .ru, .st, .se in cascade)",
+        mirror_ru: "sci-hub.ru (Most stable)",
+        zotero_toggle: "Automatically sync with Zotero",
+        zotero_id_label: "Zotero User ID / Group ID:",
+        zotero_key_label: "Zotero API Key:",
+        zotero_key_placeholder: "Your secret Zotero API Key",
+        btn_start: "Start Download & Extraction",
+        btn_processing: "Processing Papers...",
+        stat_total: "Total DOIs",
+        stat_downloaded: "Downloaded",
+        stat_not_found: "Not Found",
+        stat_citations: "Total Citations",
+        waiting_list: "Waiting for paper list...",
+        format_active_label: "Active Citation Format:",
+        btn_download_zip: "Download All (ZIP)",
+        btn_copy_citations: "Copy Citations",
+        table_title: "Batch Results",
+        results_count_zero: "0 papers processed",
+        results_count_plural: "papers processed",
+        th_status: "Status",
+        th_title: "Title & Journal",
+        th_year: "Year",
+        th_citations: "Citations",
+        th_source: "Source",
+        th_actions: "Actions",
+        empty_title: "No papers processed yet.",
+        empty_desc: "Paste DOIs in the left panel and click Start.",
+        status_downloaded: "🟢 Downloaded",
+        status_searching: "🟡 Searching...",
+        status_unavailable: "🔴 Unavailable",
+        unknown_journal: "Unknown journal",
+        btn_cite: "Cite",
+        modal_cite_title_bib: "Citation in BibTeX (.bib) Format",
+        modal_cite_title_ris: "Citation in RIS (.ris) Format",
+        modal_cite_title_enw: "Citation in EndNote (.enw) Format",
+        btn_copy_clipboard: "Copy to Clipboard",
+        btn_close: "Close",
+        alert_copied: "Citation copied to clipboard!",
+        alert_all_copied: "All citations in {fmt} format have been copied to clipboard!",
+        alert_no_dois: "Please enter at least one DOI.",
+        alert_invalid_dois: "No valid DOIs detected.",
+        alert_no_citations: "No citations generated yet."
+      }
+    };
+
+    let currentLang = 'es';
+    let pollInterval = null;
+    let currentBatchResults = [];
+    let activeFormat = 'bib'; // 'bib' | 'ris' | 'enw'
+    let currentModalItem = null;
+
+    // --- LANGUAGE MANAGEMENT ---
+    function initLanguage() {
+      const savedLang = localStorage.getItem('app_language');
+      currentLang = savedLang === 'en' ? 'en' : 'es';
+      applyLanguage(currentLang);
+    }
+
+    function toggleLanguage() {
+      currentLang = currentLang === 'es' ? 'en' : 'es';
+      localStorage.setItem('app_language', currentLang);
+      applyLanguage(currentLang);
+    }
+
+    function applyLanguage(lang) {
+      document.getElementById('langLabel').textContent = lang.toUpperCase();
+      const dict = I18N[lang];
+
+      // Update text nodes with data-i18n
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (dict[key]) {
+          el.innerHTML = dict[key];
+        }
+      });
+
+      // Update placeholders with data-i18n-placeholder
+      document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        const key = el.getAttribute('data-i18n-placeholder');
+        if (dict[key]) {
+          el.setAttribute('placeholder', dict[key]);
+        }
+      });
+
+      // Update theme button text
+      const isDark = document.documentElement.classList.contains('dark');
+      document.getElementById('themeText').textContent = isDark ? dict.theme_dark : dict.theme_light;
+
+      // Re-render table if results exist to update localized badges
+      if (currentBatchResults.length > 0) {
+        updateResultsTable(currentBatchResults);
+      }
+    }
+
+    function t(key, replacements = {}) {
+      let str = (I18N[currentLang] && I18N[currentLang][key]) || key;
+      for (const [k, v] of Object.entries(replacements)) {
+        str = str.replace(`{${k}}`, v);
+      }
+      return str;
+    }
+
+    // --- THEME MANAGEMENT ---
+    function initTheme() {
+      const savedTheme = localStorage.getItem('theme');
+      if (savedTheme === 'dark') {
+        document.documentElement.classList.add('dark');
+        updateThemeUI(true);
+      } else {
+        document.documentElement.classList.remove('dark');
+        updateThemeUI(false);
+      }
+    }
+
+    function toggleTheme() {
+      const isDark = document.documentElement.classList.toggle('dark');
+      localStorage.setItem('theme', isDark ? 'dark' : 'light');
+      updateThemeUI(isDark);
+    }
+
+    function updateThemeUI(isDark) {
+      const icon = document.getElementById('themeIcon');
+      const text = document.getElementById('themeText');
+      const dict = I18N[currentLang] || I18N.es;
+      if (isDark) {
+        icon.textContent = '🌙';
+        text.textContent = dict.theme_dark;
+      } else {
+        icon.textContent = '☀️';
+        text.textContent = dict.theme_light;
+      }
+    }
+
+    // --- FORMAT SWITCHER ---
+    function setActiveFormat(fmt) {
+      activeFormat = fmt;
+      
+      const btnBib = document.getElementById('btnFormatBib');
+      const btnRis = document.getElementById('btnFormatRis');
+      const btnEnw = document.getElementById('btnFormatEnw');
+
+      [btnBib, btnRis, btnEnw].forEach(btn => {
+        btn.className = "px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-white transition";
+      });
+
+      const activeBtn = fmt === 'bib' ? btnBib : (fmt === 'ris' ? btnRis : btnEnw);
+      activeBtn.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white shadow transition";
+
+      // Update download file button
+      const extMap = { 'bib': 'references.bib', 'ris': 'references.ris', 'enw': 'references.enw' };
+      const labelMap = { 
+        'bib': currentLang === 'es' ? 'Descargar .bib' : 'Download .bib', 
+        'ris': currentLang === 'es' ? 'Descargar .ris' : 'Download .ris', 
+        'enw': currentLang === 'es' ? 'Descargar .enw' : 'Download .enw' 
+      };
+      
+      const fileBtn = document.getElementById('btnDownloadFormatFile');
+      fileBtn.href = '/downloads/' + extMap[fmt];
+      fileBtn.setAttribute('download', extMap[fmt]);
+      document.getElementById('btnFormatFileLabel').textContent = labelMap[fmt];
+    }
+
+    function toggleZoteroFields() {
+      const checked = document.getElementById('zoteroToggle').checked;
+      const fields = document.getElementById('zoteroFields');
+      if (checked) {
+        fields.classList.remove('hidden');
+      } else {
+        fields.classList.add('hidden');
+      }
+    }
+
+    function loadSampleDOIs() {
+      const samples = [
+        "10.1038/nature12373",      // Nature: Nanometre-scale thermometry in a living cell
+        "10.1126/science.1251817",    // Science: Human Genomics
+        "10.1016/j.cell.2013.06.027"  // Cell: Molecular Biology
+      ];
+      document.getElementById('doiInput').value = samples.join("\n");
+    }
+
+    function clearDOIs() {
+      document.getElementById('doiInput').value = "";
+    }
+
+    function handleFileSelect(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        document.getElementById('doiInput').value = e.target.result;
+      };
+      reader.readAsText(file);
+    }
+
+    async function startProcessing() {
+      const rawText = document.getElementById('doiInput').value.trim();
+      if (!rawText) {
+        alert(t('alert_no_dois'));
+        return;
+      }
+
+      const lines = rawText.split(/[\r\n,]+/).map(s => s.trim()).filter(Boolean);
+      if (lines.length === 0) {
+        alert(t('alert_invalid_dois'));
+        return;
+      }
+
+      const renameMode = document.querySelector('input[name="renameMode"]:checked').value;
+      const mirrorVal = document.getElementById('mirrorSelect').value;
+      const zoteroEnabled = document.getElementById('zoteroToggle').checked;
+      const zoteroId = document.getElementById('zoteroId').value.trim();
+      const zoteroKey = document.getElementById('zoteroKey').value.trim();
+
+      const options = {
+        rename_mode: renameMode,
+        mirrors: mirrorVal === "auto" ? null : mirrorVal,
+        zotero_enabled: zoteroEnabled,
+        zotero_id: zoteroId,
+        zotero_key: zoteroKey
+      };
+
+      setButtonState(true);
+      document.getElementById('exportActionButtons').classList.add('hidden');
+      document.getElementById('resultsTableBody').innerHTML = '';
+      currentBatchResults = [];
+
+      try {
+        const response = await fetch('/api/process', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dois: lines, options: options })
+        });
+
+        if (!response.ok) {
+          const err = await response.json();
+          alert("Error: " + (err.error || "No se pudo iniciar el procesamiento"));
+          setButtonState(false);
+          return;
+        }
+
+        if (pollInterval) clearInterval(pollInterval);
+        pollInterval = setInterval(checkStatus, 800);
+      } catch (err) {
+        alert("Error: " + err.message);
+        setButtonState(false);
+      }
+    }
+
+    async function checkStatus() {
+      try {
+        const res = await fetch('/api/status');
+        const state = await res.json();
+
+        updateProgressUI(state);
+        updateResultsTable(state.results);
+
+        if (!state.busy) {
+          clearInterval(pollInterval);
+          pollInterval = null;
+          setButtonState(false);
+
+          if (state.results && state.results.length > 0) {
+            document.getElementById('exportActionButtons').classList.remove('hidden');
+            if (state.zip_file) {
+              document.getElementById('btnZip').href = '/downloads/' + state.zip_file;
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Error al consultar estado:", e);
+      }
+    }
+
+    function setButtonState(busy) {
+      const btn = document.getElementById('btnProcess');
+      const icon = document.getElementById('btnIcon');
+      const text = document.getElementById('btnText');
+
+      if (busy) {
+        btn.disabled = true;
+        btn.classList.add('opacity-70', 'cursor-not-allowed');
+        icon.textContent = '⏳';
+        text.textContent = t('btn_processing');
+      } else {
+        btn.disabled = false;
+        btn.classList.remove('opacity-70', 'cursor-not-allowed');
+        icon.textContent = '🚀';
+        text.textContent = t('btn_start');
+      }
+    }
+
+    function updateProgressUI(state) {
+      const total = state.total || 0;
+      const current = state.current_index || 0;
+      const percent = total > 0 ? Math.round((current / total) * 100) : 0;
+
+      document.getElementById('progressPercent').textContent = percent + '%';
+      document.getElementById('progressBar').style.width = percent + '%';
+      document.getElementById('progressMessage').textContent = state.message || t('waiting_list');
+
+      const results = state.results || [];
+      const success = results.filter(r => r.status === 'success').length;
+      const failed = results.filter(r => r.status === 'not_found' || r.status === 'error').length;
+      const totalCites = results.reduce((acc, r) => acc + (r.citations || 0), 0);
+
+      document.getElementById('statTotal').textContent = total;
+      document.getElementById('statSuccess').textContent = success;
+      document.getElementById('statFailed').textContent = failed;
+      document.getElementById('statCites').textContent = totalCites.toLocaleString();
+    }
+
+    function updateResultsTable(results) {
+      if (!results || results.length === 0) return;
+      currentBatchResults = results;
+
+      const tbody = document.getElementById('resultsTableBody');
+      tbody.innerHTML = '';
+
+      results.forEach((item, index) => {
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-50 dark:hover:bg-slate-900/60 transition";
+
+        // Localized Status Badge
+        let statusBadge = '';
+        if (item.status === 'success') {
+          statusBadge = `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">${t('status_downloaded')}</span>`;
+        } else if (item.status === 'processing') {
+          statusBadge = `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">${t('status_searching')}</span>`;
+        } else {
+          statusBadge = `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">${t('status_unavailable')}</span>`;
+        }
+
+        // Title and Journal
+        const titleHtml = `
+          <div>
+            <div class="font-semibold text-slate-800 dark:text-slate-100 line-clamp-1" title="${item.title}">${item.title || item.doi}</div>
+            <div class="text-[11px] text-slate-500 dark:text-slate-400 flex items-center space-x-2 mt-0.5">
+              <span>${item.journal || t('unknown_journal')}</span>
+              <span>•</span>
+              <a href="https://doi.org/${item.doi}" target="_blank" class="text-indigo-600 dark:text-indigo-400 hover:underline font-mono">${item.doi}</a>
+            </div>
+          </div>
+        `;
+
+        // Citations Pill
+        const isHighImpact = (item.citations || 0) > 100;
+        const citesHtml = `
+          <span class="inline-block px-2 py-0.5 rounded text-[11px] font-mono ${isHighImpact ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300 font-bold border border-amber-500/20' : 'text-slate-500 dark:text-slate-400'}">
+            ${isHighImpact ? '🔥 ' : ''}${item.citations || 0}
+          </span>
+        `;
+
+        // Actions
+        let actionsHtml = `<div class="flex items-center justify-end space-x-1.5">`;
+        if (item.pdf_filename) {
+          actionsHtml += `
+            <a href="/downloads/${encodeURIComponent(item.pdf_filename)}" target="_blank" class="px-2.5 py-1 bg-indigo-50 dark:bg-indigo-600/20 hover:bg-indigo-100 dark:hover:bg-indigo-600/40 text-indigo-700 dark:text-indigo-300 rounded-lg text-[11px] font-semibold border border-indigo-200 dark:border-indigo-500/30 transition flex items-center space-x-1">
+              <span>⬇️</span><span>PDF</span>
+            </a>
+          `;
+        }
+        actionsHtml += `
+          <button onclick="openCitationModalByIndex(${index})" class="px-2 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-[11px] font-medium border border-slate-200 dark:border-slate-700 transition" title="${t('btn_cite')}">
+            ${t('btn_cite')}
+          </button>
+        `;
+        actionsHtml += `</div>`;
+
+        tr.innerHTML = `
+          <td class="px-4 py-3 whitespace-nowrap">${statusBadge}</td>
+          <td class="px-4 py-3 max-w-sm">${titleHtml}</td>
+          <td class="px-3 py-3 text-center font-mono text-slate-700 dark:text-slate-300">${item.year || '-'}</td>
+          <td class="px-3 py-3 text-center">${citesHtml}</td>
+          <td class="px-4 py-3 text-slate-500 dark:text-slate-400 text-[11px] whitespace-nowrap">${item.source || '-'}</td>
+          <td class="px-4 py-3 text-right whitespace-nowrap">${actionsHtml}</td>
+        `;
+
+        tbody.appendChild(tr);
+      });
+
+      document.getElementById('resultsCount').textContent = `${results.length} ${t('results_count_plural')}`;
+    }
+
+    // --- MODAL CITATION LOGIC ---
+    function openCitationModalByIndex(idx) {
+      const item = currentBatchResults[idx];
+      if (!item) return;
+      currentModalItem = item;
+      switchModalFormat(activeFormat);
+      document.getElementById('citationModal').classList.remove('hidden');
+    }
+
+    function switchModalFormat(fmt) {
+      if (!currentModalItem) return;
+
+      const tabBib = document.getElementById('modalTabBib');
+      const tabRis = document.getElementById('modalTabRis');
+      const tabEnw = document.getElementById('modalTabEnw');
+
+      [tabBib, tabRis, tabEnw].forEach(tab => {
+        tab.className = "px-3 py-1 rounded-lg text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-indigo-600";
+      });
+
+      const activeTab = fmt === 'bib' ? tabBib : (fmt === 'ris' ? tabRis : tabEnw);
+      activeTab.className = "px-3 py-1 rounded-lg text-xs font-semibold bg-indigo-600 text-white shadow";
+
+      let content = "";
+      if (fmt === 'bib') {
+        content = currentModalItem.bibtex || "No disponible";
+        document.getElementById('modalTitle').textContent = t('modal_cite_title_bib');
+      } else if (fmt === 'ris') {
+        content = currentModalItem.ris || "No disponible";
+        document.getElementById('modalTitle').textContent = t('modal_cite_title_ris');
+      } else {
+        content = currentModalItem.enw || "No disponible";
+        document.getElementById('modalTitle').textContent = t('modal_cite_title_enw');
+      }
+
+      document.getElementById('citationModalContent').textContent = content;
+    }
+
+    function closeCitationModal() {
+      document.getElementById('citationModal').classList.add('hidden');
+    }
+
+    function copyModalCitation() {
+      const content = document.getElementById('citationModalContent').textContent;
+      navigator.clipboard.writeText(content);
+      alert(t('alert_copied'));
+    }
+
+    function copyAllCitations() {
+      let all = "";
+      if (activeFormat === 'bib') {
+        all = currentBatchResults.map(r => r.bibtex).filter(Boolean).join("\n\n");
+      } else if (activeFormat === 'ris') {
+        all = currentBatchResults.map(r => r.ris).filter(Boolean).join("\n\n");
+      } else {
+        all = currentBatchResults.map(r => r.enw).filter(Boolean).join("\n\n");
+      }
+
+      if (all) {
+        navigator.clipboard.writeText(all);
+        alert(t('alert_all_copied', { fmt: activeFormat.toUpperCase() }));
+      } else {
+        alert(t('alert_no_citations'));
+      }
+    }
+
+    // Inicializar idioma y tema al cargar la página
+    initTheme();
+    initLanguage();
+  </script>
+</body>
+</html>
