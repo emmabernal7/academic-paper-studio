@@ -19,3 +19,11 @@ web_downloader/downloads/*
 # Operating System files
 .DS_Store
 Thumbs.db
+
+# Local scripts & unrelated development files
+subir_a_github.bat
+ccdc_search.py
+CCDC_TO_ANTIGRAVITY.md
+ccdc_to_antigravity.py
+.agents/skills/ai-image-generation/
+.agents/skills/find-skills/
