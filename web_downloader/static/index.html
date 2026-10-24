@@ -41,8 +41,22 @@
           <h1 class="text-base font-bold tracking-tight text-slate-900 dark:text-white">Academic Paper Studio</h1>
           <span class="text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">Toolkit v2.1</span>
         </div>
-        <p class="text-xs text-slate-500 dark:text-slate-400" data-i18n="navbar_subtitle">Crossref • Sci-Hub • BibTeX • RIS • EndNote • Zotero</p>
+        <p class="text-xs text-slate-500 dark:text-slate-400" data-i18n="navbar_subtitle">Crossref • Sci-Hub • Anna's Archive • BibTeX • RIS • EndNote • Zotero</p>
         <p class="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 tracking-wide mt-0.5" data-i18n="created_by">Creado por EBC 2026</p>
+      </div>
+    </div>
+
+    <!-- CENTER MODE SWITCHER BUTTONS (PAPERS vs BOOKS) -->
+    <div class="flex items-center justify-center my-2 sm:my-0">
+      <div class="inline-flex p-1 rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-inner">
+        <button id="tabModePapers" onclick="switchAppMode('papers')" class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-2 bg-gradient-to-r from-indigo-600 to-cyan-500 text-white shadow-md">
+          <span>📄</span>
+          <span data-i18n="mode_papers">Modo Artículos (DOI)</span>
+        </button>
+        <button id="tabModeBooks" onclick="switchAppMode('books')" class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-2 text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-white">
+          <span>📚</span>
+          <span data-i18n="mode_books">Modo Descargador de Libros</span>
+        </button>
       </div>
     </div>
     
@@ -66,8 +80,8 @@
     </div>
   </header>
 
-  <!-- MAIN CONTENT -->
-  <main class="flex-1 max-w-[1600px] w-full mx-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+  <!-- MAIN CONTENT: PAPERS (DOI) MODE -->
+  <main id="viewPapers" class="flex-1 max-w-[1600px] w-full mx-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
     <!-- LEFT COLUMN: INPUTS & SETTINGS (5 Cols) -->
     <div class="lg:col-span-5 space-y-5">
@@ -275,6 +289,136 @@
     </div>
   </main>
 
+  <!-- MAIN CONTENT: BOOK DOWNLOADER MODE (Anna's Archive / Z-Library / LibGen) -->
+  <main id="viewBooks" class="hidden flex-1 max-w-[1600px] w-full mx-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+    
+    <!-- LEFT COLUMN: BOOK SEARCH & FILTERS (4 Cols) -->
+    <div class="lg:col-span-4 space-y-5">
+      <div class="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm dark:shadow-xl space-y-4 transition-colors">
+        <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+          <div class="flex items-center space-x-2">
+            <span class="text-indigo-500 text-lg">📚</span>
+            <h2 class="text-sm font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200" data-i18n="books_panel_title">Buscador y Descargador de Libros</h2>
+          </div>
+          <button onclick="clearBookSearch()" class="text-xs font-medium text-slate-400 hover:text-rose-500 hover:underline" data-i18n="clear">Limpiar</button>
+        </div>
+
+        <!-- Book Name / Author / ISBN Input -->
+        <div>
+          <label class="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5" data-i18n="books_query_label">Nombre del Libro, Autor o ISBN:</label>
+          <input type="text" id="bookQueryInput" onkeydown="if(event.key==='Enter') searchBooks()" placeholder="Escribe el título del libro o autor aquí..." data-i18n-placeholder="books_query_placeholder"
+            class="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition">
+        </div>
+
+        <!-- Language Filter -->
+        <div>
+          <label class="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5" data-i18n="books_lang_label">Filtro de Idioma:</label>
+          <select id="bookLangSelect" class="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-indigo-500">
+            <option value="all" data-i18n="lang_all">🌐 Todos los idiomas</option>
+            <option value="es" data-i18n="lang_es">🇪🇸 Español</option>
+            <option value="en" data-i18n="lang_en">🇬🇧 Inglés (English)</option>
+            <option value="pt" data-i18n="lang_pt">🇵🇹 Portugués (Português)</option>
+            <option value="fr" data-i18n="lang_fr">🇫🇷 Francés (Français)</option>
+            <option value="de" data-i18n="lang_de">🇩🇪 Alemán (Deutsch)</option>
+            <option value="it" data-i18n="lang_it">🇮🇹 Italiano</option>
+          </select>
+        </div>
+
+        <!-- Year Period Filter -->
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <label class="block text-xs font-medium text-slate-600 dark:text-slate-300" data-i18n="books_year_label">Periodo de Año de Publicación:</label>
+            <div class="flex items-center space-x-1.5 text-[10px]">
+              <button onclick="setBookYearPreset(2020, 2026)" class="px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/20 font-medium">2020–2026</button>
+              <button onclick="setBookYearPreset(2010, 2026)" class="px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/20 font-medium">2010–2026</button>
+              <button onclick="setBookYearPreset('', '')" class="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-300" data-i18n="books_year_all">Todos</button>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-2.5">
+            <div>
+              <input type="number" id="bookYearFrom" min="1800" max="2030" placeholder="Desde (Ej: 2010)" data-i18n-placeholder="books_year_from_ph"
+                class="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-indigo-500">
+            </div>
+            <div>
+              <input type="number" id="bookYearTo" min="1800" max="2030" placeholder="Hasta (Ej: 2026)" data-i18n-placeholder="books_year_to_ph"
+                class="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-indigo-500">
+            </div>
+          </div>
+        </div>
+
+        <!-- File Format Filter -->
+        <div>
+          <label class="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5" data-i18n="books_format_label">Formato de Archivo:</label>
+          <select id="bookExtSelect" class="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-indigo-500">
+            <option value="all" data-i18n="books_ext_all">📄 Todos (PDF, EPUB, DJVU)</option>
+            <option value="pdf">📕 PDF</option>
+            <option value="epub">📘 EPUB</option>
+            <option value="djvu">📗 DJVU</option>
+          </select>
+        </div>
+
+        <!-- Search Action Button -->
+        <button id="btnSearchBooks" onclick="searchBooks()" class="w-full mt-2 py-3.5 px-4 bg-gradient-to-r from-indigo-600 hover:from-indigo-500 to-cyan-500 hover:to-cyan-400 text-white font-bold text-sm rounded-xl shadow-lg shadow-indigo-600/20 transition flex items-center justify-center space-x-2">
+          <span id="btnBookIcon">🔍</span>
+          <span id="btnBookText" data-i18n="btn_search_books">Buscar Libros en Anna's Archive</span>
+        </button>
+
+        <div class="p-3 rounded-xl bg-indigo-500/5 border border-indigo-500/15 text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed" data-i18n="books_info_note">
+          💡 Conectado al índice unificado de <strong>Anna's Archive (Z-Library &amp; LibGen)</strong>. Descarga libros completos en PDF/EPUB y genera sus citas bibliográficas <code>@book</code>.
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT COLUMN: BOOK SEARCH RESULTS (8 Cols) -->
+    <div class="lg:col-span-8 space-y-5">
+      
+      <!-- BOOK STATUS & EXPORT BAR -->
+      <div class="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm dark:shadow-xl flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center space-x-3">
+          <span class="text-xl">📖</span>
+          <div>
+            <div id="bookSearchStatus" class="text-xs font-bold text-slate-800 dark:text-slate-100" data-i18n="books_waiting_status">Ingresa el nombre de un libro para buscar en el catálogo</div>
+            <div id="bookResultsCount" class="text-[11px] text-slate-400">0 libros encontrados</div>
+          </div>
+        </div>
+
+        <div class="flex items-center space-x-2">
+          <button onclick="copyAllBookCitations()" class="px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs rounded-xl border border-slate-200 dark:border-slate-700 transition flex items-center space-x-1.5">
+            <span>📋</span>
+            <span data-i18n="btn_copy_book_citations">Copiar Citas (@book)</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- BOOKS RESULTS TABLE -->
+      <div class="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm dark:shadow-xl overflow-hidden transition-colors">
+        <div class="overflow-x-auto max-h-[600px] custom-scrollbar">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50 dark:bg-slate-950/80 text-slate-500 dark:text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800 sticky top-0">
+              <tr>
+                <th class="px-4 py-3" data-i18n="th_book_title">Título, Autor &amp; Editorial</th>
+                <th class="px-3 py-3 text-center" data-i18n="th_year">Año</th>
+                <th class="px-3 py-3 text-center" data-i18n="th_book_lang">Idioma</th>
+                <th class="px-3 py-3 text-center" data-i18n="th_book_format">Formato / Tamaño</th>
+                <th class="px-4 py-3 text-right" data-i18n="th_actions">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="booksTableBody" class="divide-y divide-slate-200 dark:divide-slate-800/60">
+              <tr>
+                <td colspan="5" class="px-6 py-14 text-center text-slate-400 dark:text-slate-500">
+                  <div class="text-3xl mb-2">🏛️</div>
+                  <p class="font-medium" data-i18n="books_empty_title">Buscador de Libros Anna's Archive / Z-Library</p>
+                  <p class="text-[11px] text-slate-400 dark:text-slate-600 mt-0.5" data-i18n="books_empty_desc">Escribe el nombre del libro a la izquierda, ajusta el idioma o rango de años y presiona Buscar.</p>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
   <!-- MODAL FOR CITATION PREVIEW (BIBTEX / RIS / ENDNOTE) -->
   <div id="citationModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 dark:bg-black/80 backdrop-blur-sm p-4">
     <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4">
@@ -311,8 +455,41 @@
     // --- I18N DICTIONARY ---
     const I18N = {
       es: {
-        navbar_subtitle: "Crossref • Sci-Hub • BibTeX • RIS • EndNote • Zotero",
+        navbar_subtitle: "Crossref • Sci-Hub • Anna's Archive • BibTeX • RIS • EndNote • Zotero",
         created_by: "Creado por EBC 2026",
+        mode_papers: "Modo Artículos (DOI)",
+        mode_books: "Modo Descargador de Libros",
+        books_panel_title: "Buscador y Descargador de Libros",
+        books_query_label: "Nombre del Libro, Autor o ISBN:",
+        books_query_placeholder: "Escribe el título del libro o autor aquí...",
+        books_lang_label: "Filtro de Idioma:",
+        lang_all: "🌐 Todos los idiomas",
+        lang_es: "🇪🇸 Español",
+        lang_en: "🇬🇧 Inglés (English)",
+        lang_pt: "🇵🇹 Portugués (Português)",
+        lang_fr: "🇫🇷 Francés (Français)",
+        lang_de: "🇩🇪 Alemán (Deutsch)",
+        lang_it: "🇮🇹 Italiano",
+        books_year_label: "Periodo de Año de Publicación:",
+        books_year_all: "Todos",
+        books_year_from_ph: "Desde (Ej: 2010)",
+        books_year_to_ph: "Hasta (Ej: 2026)",
+        books_format_label: "Formato de Archivo:",
+        books_ext_all: "📄 Todos (PDF, EPUB, DJVU)",
+        btn_search_books: "Buscar Libros en Anna's Archive",
+        btn_searching_books: "Buscando en el catálogo...",
+        books_info_note: "💡 Conectado al índice unificado de <strong>Anna's Archive (Z-Library &amp; LibGen)</strong>. Descarga libros completos en PDF/EPUB y genera sus citas bibliográficas <code>@book</code>.",
+        books_waiting_status: "Ingresa el nombre de un libro para buscar en el catálogo",
+        btn_copy_book_citations: "Copiar Citas (@book)",
+        th_book_title: "Título, Autor & Editorial",
+        th_book_lang: "Idioma",
+        th_book_format: "Formato / Tamaño",
+        books_empty_title: "Buscador de Libros Anna's Archive / Z-Library",
+        books_empty_desc: "Escribe el nombre del libro a la izquierda, ajusta el idioma o rango de años y presiona Buscar.",
+        books_no_results: "No se encontraron libros con esos filtros. Intenta ampliar el rango de años o cambiar el idioma.",
+        books_found_plural: "libros encontrados",
+        btn_download_book: "Descargar",
+        alert_no_book_query: "Por favor escribe el nombre del libro, autor o ISBN para buscar.",
         port_active: "Puerto 8765 Activo",
         theme_light: "Modo Claro",
         theme_dark: "Modo Oscuro",
@@ -371,8 +548,41 @@
         alert_no_citations: "No hay citas generadas aún."
       },
       en: {
-        navbar_subtitle: "Crossref • Sci-Hub • BibTeX • RIS • EndNote • Zotero",
+        navbar_subtitle: "Crossref • Sci-Hub • Anna's Archive • BibTeX • RIS • EndNote • Zotero",
         created_by: "Created by EBC 2026",
+        mode_papers: "Papers Mode (DOI)",
+        mode_books: "Book Downloader Mode",
+        books_panel_title: "Book Search & Downloader",
+        books_query_label: "Book Title, Author, or ISBN:",
+        books_query_placeholder: "Enter book title or author here...",
+        books_lang_label: "Language Filter:",
+        lang_all: "🌐 All languages",
+        lang_es: "🇪🇸 Spanish (Español)",
+        lang_en: "🇬🇧 English",
+        lang_pt: "🇵🇹 Portuguese",
+        lang_fr: "🇫🇷 French",
+        lang_de: "🇩🇪 German",
+        lang_it: "🇮🇹 Italian",
+        books_year_label: "Publication Year Range:",
+        books_year_all: "All",
+        books_year_from_ph: "From (e.g. 2010)",
+        books_year_to_ph: "To (e.g. 2026)",
+        books_format_label: "File Format:",
+        books_ext_all: "📄 All (PDF, EPUB, DJVU)",
+        btn_search_books: "Search Books on Anna's Archive",
+        btn_searching_books: "Searching catalog...",
+        books_info_note: "💡 Connected to the unified <strong>Anna's Archive (Z-Library &amp; LibGen)</strong> index. Download full books in PDF/EPUB and generate <code>@book</code> citations.",
+        books_waiting_status: "Enter a book title to search the catalog",
+        btn_copy_book_citations: "Copy Citations (@book)",
+        th_book_title: "Title, Author & Publisher",
+        th_book_lang: "Language",
+        th_book_format: "Format / Size",
+        books_empty_title: "Anna's Archive / Z-Library Book Searcher",
+        books_empty_desc: "Type the book name on the left, adjust language or year range, and click Search.",
+        books_no_results: "No books found matching those filters. Try widening the year range or changing language.",
+        books_found_plural: "books found",
+        btn_download_book: "Download",
+        alert_no_book_query: "Please enter a book title, author, or ISBN to search.",
         port_active: "Port 8765 Active",
         theme_light: "Light Mode",
         theme_dark: "Dark Mode",
@@ -827,6 +1037,205 @@
         all = currentBatchResults.map(r => r.ris).filter(Boolean).join("\n\n");
       } else {
         all = currentBatchResults.map(r => r.enw).filter(Boolean).join("\n\n");
+      }
+
+      if (all) {
+        navigator.clipboard.writeText(all);
+        alert(t('alert_all_copied', { fmt: activeFormat.toUpperCase() }));
+      } else {
+        alert(t('alert_no_citations'));
+      }
+    }
+
+    // --- BOOK DOWNLOADER MODE LOGIC (Anna's Archive / Z-Library / LibGen) ---
+    let currentAppMode = 'papers';
+    let currentBookResults = [];
+
+    function switchAppMode(mode) {
+      currentAppMode = mode;
+      const viewPapers = document.getElementById('viewPapers');
+      const viewBooks = document.getElementById('viewBooks');
+      const tabPapers = document.getElementById('tabModePapers');
+      const tabBooks = document.getElementById('tabModeBooks');
+
+      const activeClasses = "px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-2 bg-gradient-to-r from-indigo-600 to-cyan-500 text-white shadow-md";
+      const inactiveClasses = "px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-2 text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-white";
+
+      if (mode === 'books') {
+        viewPapers.classList.add('hidden');
+        viewBooks.classList.remove('hidden');
+        tabBooks.className = activeClasses;
+        tabPapers.className = inactiveClasses;
+      } else {
+        viewBooks.classList.add('hidden');
+        viewPapers.classList.remove('hidden');
+        tabPapers.className = activeClasses;
+        tabBooks.className = inactiveClasses;
+      }
+    }
+
+    function setBookYearPreset(fromYr, toYr) {
+      document.getElementById('bookYearFrom').value = fromYr;
+      document.getElementById('bookYearTo').value = toYr;
+    }
+
+    function clearBookSearch() {
+      document.getElementById('bookQueryInput').value = '';
+      document.getElementById('bookLangSelect').value = 'all';
+      document.getElementById('bookYearFrom').value = '';
+      document.getElementById('bookYearTo').value = '';
+      document.getElementById('bookExtSelect').value = 'all';
+      currentBookResults = [];
+      document.getElementById('bookResultsCount').textContent = `0 ${t('books_found_plural')}`;
+      document.getElementById('bookSearchStatus').textContent = t('books_waiting_status');
+      document.getElementById('booksTableBody').innerHTML = `
+        <tr>
+          <td colspan="5" class="px-6 py-14 text-center text-slate-400 dark:text-slate-500">
+            <div class="text-3xl mb-2">🏛️</div>
+            <p class="font-medium">${t('books_empty_title')}</p>
+            <p class="text-[11px] text-slate-400 dark:text-slate-600 mt-0.5">${t('books_empty_desc')}</p>
+          </td>
+        </tr>
+      `;
+    }
+
+    async function searchBooks() {
+      const query = document.getElementById('bookQueryInput').value.trim();
+      if (!query) {
+        alert(t('alert_no_book_query'));
+        return;
+      }
+
+      const lang = document.getElementById('bookLangSelect').value;
+      const yearFrom = document.getElementById('bookYearFrom').value.trim();
+      const yearTo = document.getElementById('bookYearTo').value.trim();
+      const ext = document.getElementById('bookExtSelect').value;
+
+      const btn = document.getElementById('btnSearchBooks');
+      const icon = document.getElementById('btnBookIcon');
+      const text = document.getElementById('btnBookText');
+
+      btn.disabled = true;
+      btn.classList.add('opacity-70', 'cursor-not-allowed');
+      icon.textContent = '⏳';
+      text.textContent = t('btn_searching_books');
+      document.getElementById('bookSearchStatus').textContent = `${t('btn_searching_books')} "${query}"...`;
+
+      try {
+        const res = await fetch('/api/books/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query: query,
+            lang: lang,
+            year_from: yearFrom,
+            year_to: yearTo,
+            ext: ext
+          })
+        });
+
+        const data = await res.json();
+        const books = data.books || [];
+        currentBookResults = books;
+        renderBooksTable(books, query);
+      } catch (err) {
+        alert("Error: " + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.classList.remove('opacity-70', 'cursor-not-allowed');
+        icon.textContent = '🔍';
+        text.textContent = t('btn_search_books');
+      }
+    }
+
+    function renderBooksTable(books, query) {
+      const tbody = document.getElementById('booksTableBody');
+      tbody.innerHTML = '';
+
+      document.getElementById('bookResultsCount').textContent = `${books.length} ${t('books_found_plural')}`;
+      document.getElementById('bookSearchStatus').textContent = `${query} — ${books.length} ${t('books_found_plural')}`;
+
+      if (!books || books.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="5" class="px-6 py-12 text-center text-slate-400 dark:text-slate-500">
+              <div class="text-3xl mb-2">🔍</div>
+              <p class="font-medium">${t('books_no_results')}</p>
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      books.forEach((b, idx) => {
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-50 dark:hover:bg-slate-900/60 transition";
+
+        const extUpper = (b.extension || 'PDF').toUpperCase();
+        const extBadgeColor = extUpper === 'PDF'
+          ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
+          : (extUpper === 'EPUB'
+            ? 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20'
+            : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20');
+
+        const isbnSpan = b.isbn ? `<span class="font-mono text-[10px] text-emerald-600 dark:text-emerald-400">ISBN: ${b.isbn}</span>` : '';
+        const pubSpan = b.publisher ? `<span>${b.publisher}</span>` : '';
+
+        tr.innerHTML = `
+          <td class="px-4 py-3 max-w-md">
+            <div class="font-semibold text-slate-800 dark:text-slate-100 line-clamp-2" title="${b.title}">${b.title}</div>
+            <div class="text-[11px] text-indigo-600 dark:text-indigo-400 font-medium mt-0.5">${b.author}</div>
+            <div class="text-[10px] text-slate-400 flex flex-wrap items-center gap-2 mt-0.5">
+              ${pubSpan}
+              ${isbnSpan}
+            </div>
+          </td>
+          <td class="px-3 py-3 text-center font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap">${b.year || '-'}</td>
+          <td class="px-3 py-3 text-center whitespace-nowrap">
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+              ${b.language || '-'}
+            </span>
+          </td>
+          <td class="px-3 py-3 text-center whitespace-nowrap">
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border ${extBadgeColor}">
+              ${extUpper}
+            </span>
+            <div class="text-[10px] text-slate-400 font-mono mt-0.5">${b.size || ''}</div>
+          </td>
+          <td class="px-4 py-3 text-right whitespace-nowrap">
+            <div class="flex items-center justify-end space-x-1.5">
+              <a href="${b.direct_resolve_url}" target="_blank" class="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-[11px] font-semibold shadow transition flex items-center space-x-1" title="Descarga directa del libro">
+                <span>⬇️</span><span>${t('btn_download_book')}</span>
+              </a>
+              <a href="${b.annas_url}" target="_blank" class="px-2 py-1.5 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 rounded-lg text-[11px] font-semibold border border-indigo-200 dark:border-indigo-800 transition" title="Ver espejos en Anna's Archive">
+                Anna's
+              </a>
+              <button onclick="openBookCitationModal(${idx})" class="px-2 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-[11px] font-medium border border-slate-200 dark:border-slate-700 transition" title="${t('btn_cite')}">
+                ${t('btn_cite')}
+              </button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function openBookCitationModal(idx) {
+      const book = currentBookResults[idx];
+      if (!book) return;
+      currentModalItem = book;
+      switchModalFormat(activeFormat);
+      document.getElementById('citationModal').classList.remove('hidden');
+    }
+
+    function copyAllBookCitations() {
+      let all = "";
+      if (activeFormat === 'bib') {
+        all = currentBookResults.map(r => r.bibtex).filter(Boolean).join("\n\n");
+      } else if (activeFormat === 'ris') {
+        all = currentBookResults.map(r => r.ris).filter(Boolean).join("\n\n");
+      } else {
+        all = currentBookResults.map(r => r.enw).filter(Boolean).join("\n\n");
       }
 
       if (all) {

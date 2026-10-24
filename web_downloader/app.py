@@ -12,7 +12,7 @@ import urllib.parse
 import threading
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 
-from downloader_core import process_batch
+from downloader_core import process_batch, search_books_catalog, resolve_book_download_url
 
 PORT = int(os.environ.get("PORT", 8765))
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -89,6 +89,16 @@ class AcademicStudioHandler(SimpleHTTPRequestHandler):
                 response_data = json.dumps(STATE)
             if not head_only:
                 self.wfile.write(response_data.encode("utf-8"))
+            return
+
+        # 1b. API: Resolve Book MD5 Download Link (302 Redirect)
+        if path == "/api/books/resolve":
+            query_params = urllib.parse.parse_qs(parsed.query)
+            md5_hash = (query_params.get("md5", [""])[0] or "").strip()
+            target_url = resolve_book_download_url(md5_hash)
+            self.send_response(302)
+            self.send_header("Location", target_url)
+            self.end_headers()
             return
 
         # 2. File Downloads
@@ -210,6 +220,35 @@ class AcademicStudioHandler(SimpleHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(json.dumps({"success": True}).encode("utf-8"))
+            return
+
+        if path == "/api/books/search":
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(content_length).decode("utf-8")
+            try:
+                data = json.loads(body)
+                query = data.get("query", "")
+                lang = data.get("lang", "all")
+                year_from = data.get("year_from", "")
+                year_to = data.get("year_to", "")
+                ext = data.get("ext", "all")
+
+                res = search_books_catalog(
+                    query=query,
+                    lang=lang,
+                    year_from=year_from,
+                    year_to=year_to,
+                    ext=ext
+                )
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(json.dumps(res).encode("utf-8"))
+            except Exception as e:
+                self.send_response(400)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
             return
 
         self.send_error(404, "Endpoint not found")

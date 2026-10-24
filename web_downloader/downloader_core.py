@@ -21,9 +21,15 @@ SCI_HUB_DEFAULT_MIRRORS = [
 ]
 
 ANNAS_ARCHIVE_MIRRORS = [
+    "https://annas-archive.gl",
     "https://annas-archive.org",
-    "https://annas-archive.se",
-    "https://annas-archive.li"
+    "https://annas-archive.se"
+]
+
+LIBGEN_BOOK_MIRRORS = [
+    "https://libgen.li",
+    "https://libgen.gs",
+    "https://libgen.vg"
 ]
 
 def sanitize_filename(text, max_len=60):
@@ -399,6 +405,20 @@ def try_annas_archive(doi, output_path):
         except Exception:
             continue
 
+    # 3. Unified MD5 Catalog Mirror Fallback (bypasses Cloudflare on cloud servers)
+    for lg_mirror in LIBGEN_BOOK_MIRRORS:
+        try:
+            r_lg = requests.get(f"{lg_mirror.rstrip('/')}/index.php?req={quote(doi)}&res=10", headers=headers, timeout=12)
+            if r_lg.status_code == 200:
+                md5s = re.findall(r'md5=([a-fA-F0-9]{32})', r_lg.text)
+                if md5s:
+                    direct_url = resolve_book_download_url(md5s[0].lower())
+                    if direct_url and "get.php" in direct_url:
+                        if download_pdf_from_url(direct_url, output_path, headers=headers):
+                            return {"success": True, "source": "Anna's Archive (Z-Lib/LibGen)"}
+        except Exception:
+            continue
+
     return {"success": False}
 
 def generate_bibtex_entry(meta):
@@ -703,3 +723,337 @@ def process_batch(dois, options, progress_callback=None, output_dir="downloads")
         "total": total,
         "success_count": sum(1 for r in results if r["status"] == "success")
     }
+
+
+# ==============================================================================
+# BOOK SEARCH & DOWNLOADER ENGINE (Anna's Archive / Z-Library / LibGen Catalog)
+# ==============================================================================
+
+LANGUAGE_ALIASES = {
+    "es": ["spanish", "español", "espanol", "es", "spa", "castellano"],
+    "en": ["english", "inglés", "ingles", "en", "eng"],
+    "pt": ["portuguese", "português", "portugues", "pt", "por"],
+    "fr": ["french", "français", "francais", "fr", "fre", "fra"],
+    "de": ["german", "deutsch", "de", "ger", "deu"],
+    "it": ["italian", "italiano", "it", "ita"],
+    "ru": ["russian", "ru", "rus"],
+    "zh": ["chinese", "zh", "chi", "zho"]
+}
+
+def generate_book_citations(book):
+    """Generate BibTeX (@book), RIS (TY - BOOK), and EndNote (%0 Book) citations."""
+    author_raw = book.get("author") or "Unknown Author"
+    first_word = sanitize_filename(author_raw.split(",")[0].split(" ")[0], 18)
+    year_str = str(book.get("year") or "Year")
+    cite_key = f"{first_word}{year_str}"
+
+    title = (book.get("title") or "Untitled Book").replace("{", "").replace("}", "")
+    publisher = book.get("publisher") or ""
+    isbn = book.get("isbn") or ""
+    url = book.get("annas_url") or ""
+
+    # 1. BibTeX (@book)
+    bib = f"""@book{{{cite_key},
+  title = {{{title}}},
+  author = {{{author_raw}}},
+  publisher = {{{publisher}}},
+  year = {{{year_str}}},
+  isbn = {{{isbn}}},
+  url = {{{url}}}
+}}"""
+
+    # 2. RIS (BOOK)
+    ris_lines = [
+        "TY  - BOOK",
+        f"TI  - {title}",
+        f"AU  - {author_raw}"
+    ]
+    if publisher:
+        ris_lines.append(f"PB  - {publisher}")
+    if year_str and year_str.isdigit():
+        ris_lines.append(f"PY  - {year_str}")
+    if isbn:
+        ris_lines.append(f"SN  - {isbn}")
+    if url:
+        ris_lines.append(f"UR  - {url}")
+    ris_lines.append("ER  - ")
+    ris = "\n".join(ris_lines)
+
+    # 3. EndNote (.enw)
+    enw_lines = [
+        "%0 Book",
+        f"%T {title}",
+        f"%A {author_raw}"
+    ]
+    if publisher:
+        enw_lines.append(f"%I {publisher}")
+    if year_str and year_str.isdigit():
+        enw_lines.append(f"%D {year_str}")
+    if isbn:
+        enw_lines.append(f"%@ {isbn}")
+    if url:
+        enw_lines.append(f"%U {url}")
+    enw = "\n".join(enw_lines)
+
+    return bib, ris, enw, cite_key
+
+
+def search_books_catalog(query, lang="all", year_from=None, year_to=None, ext="all", max_results=40):
+    """
+    Search unified book catalog (Anna's Archive / Z-Library / LibGen MD5 index).
+    Supports filtering by language, year range (year_from..year_to), and file extension (pdf, epub, etc.).
+    """
+    from urllib.parse import quote
+    if not query or not query.strip():
+        return {"success": False, "books": [], "error": "Empty query"}
+
+    query_clean = query.strip()
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+    }
+
+    # Parse year bounds safely
+    y_min = None
+    y_max = None
+    try:
+        if year_from and str(year_from).strip():
+            y_min = int(str(year_from).strip())
+    except ValueError:
+        pass
+    try:
+        if year_to and str(year_to).strip():
+            y_max = int(str(year_to).strip())
+    except ValueError:
+        pass
+
+    lang_norm = (lang or "all").strip().lower()
+    ext_norm = (ext or "all").strip().lower()
+
+    raw_books = []
+    seen_md5 = set()
+
+    # 1. Primary Unified Catalog Search (LibGen / Anna's Archive MD5 Index)
+    for mirror in LIBGEN_BOOK_MIRRORS:
+        mirror = mirror.rstrip("/")
+        # Search books (topics[]=l for Sci-Tech/Academic Books, topics[]=f for General/Fiction Books)
+        search_url = (
+            f"{mirror}/index.php?req={quote(query_clean)}"
+            f"&columns[]=t&columns[]=a&columns[]=s&columns[]=y&columns[]=p&columns[]=i"
+            f"&objects[]=f&topics[]=l&topics[]=f&res=100"
+        )
+        try:
+            r = requests.get(search_url, headers=headers, timeout=12)
+            if r.status_code != 200:
+                continue
+            soup = BeautifulSoup(r.text, "html.parser")
+            table = soup.find("table", id="tablelibgen")
+            if not table:
+                continue
+
+            rows = table.find_all("tr")[1:]
+            for row in rows:
+                tds = row.find_all("td")
+                if len(tds) < 9:
+                    continue
+
+                # Extract MD5
+                md5_matches = re.findall(r'md5=([a-fA-F0-9]{32})', str(tds[8])) or re.findall(r'/book/([a-fA-F0-9]{32})', str(tds[8]))
+                if not md5_matches:
+                    continue
+                md5_hash = md5_matches[0].lower()
+                if md5_hash in seen_md5:
+                    continue
+
+                # Extract Title & ISBN from td[0]
+                td0 = tds[0]
+                title_text = ""
+                isbn_text = ""
+                a_tags = td0.find_all("a", href=lambda h: h and "edition.php" in h)
+                if a_tags:
+                    # First edition.php link is the title; second (if green font) is ISBN
+                    first_a = a_tags[0]
+                    # Remove green ISBN font if nested
+                    for font_tag in first_a.find_all("font"):
+                        isbn_text = font_tag.get_text(" ", strip=True)
+                        font_tag.decompose()
+                    title_text = first_a.get_text(" ", strip=True)
+                    if len(a_tags) > 1 and not isbn_text:
+                        isbn_text = a_tags[1].get_text(" ", strip=True)
+                else:
+                    title_text = td0.get_text(" ", strip=True)
+
+                if not title_text:
+                    continue
+
+                author_text = tds[1].get_text(" ", strip=True) or "Autor desconocido"
+                publisher_text = tds[2].get_text(" ", strip=True) or ""
+                year_raw = tds[3].get_text(" ", strip=True) or ""
+                lang_raw = tds[4].get_text(" ", strip=True) or ""
+                pages_raw = tds[5].get_text(" ", strip=True) or ""
+                size_raw = tds[6].get_text(" ", strip=True) or ""
+                ext_raw = tds[7].get_text(" ", strip=True).lower() or "pdf"
+
+                # Extract 4-digit year
+                ym = re.search(r'\b(18\d\d|19\d\d|20\d\d)\b', year_raw)
+                book_year = int(ym.group(1)) if ym else None
+
+                seen_md5.add(md5_hash)
+                raw_books.append({
+                    "md5": md5_hash,
+                    "title": title_text,
+                    "author": author_text,
+                    "publisher": publisher_text,
+                    "year": book_year if book_year else (year_raw or "N/A"),
+                    "year_num": book_year,
+                    "language": lang_raw or "Unknown",
+                    "pages": pages_raw,
+                    "size": size_raw,
+                    "extension": ext_raw,
+                    "isbn": isbn_text,
+                    "annas_url": f"https://annas-archive.gl/md5/{md5_hash}",
+                    "direct_resolve_url": f"/api/books/resolve?md5={md5_hash}"
+                })
+
+            if raw_books:
+                break
+        except Exception:
+            continue
+
+    # 2. Secondary Fallback: Direct Anna's Archive HTML Search if primary mirrors were unreachable
+    if not raw_books:
+        for aa_mirror in ANNAS_ARCHIVE_MIRRORS:
+            aa_mirror = aa_mirror.rstrip("/")
+            aa_url = f"{aa_mirror}/search?q={quote(query_clean)}&content=book_any"
+            if lang_norm != "all":
+                aa_url += f"&lang={quote(lang_norm)}"
+            if ext_norm != "all":
+                aa_url += f"&ext={quote(ext_norm)}"
+            try:
+                r_aa = requests.get(aa_url, headers=headers, timeout=12)
+                if r_aa.status_code == 200 and "/md5/" in r_aa.text:
+                    clean_html = r_aa.text.replace("<!--", "").replace("-->", "")
+                    soup_aa = BeautifulSoup(clean_html, "html.parser")
+                    for a in soup_aa.find_all("a", href=re.compile(r'^/md5/[a-fA-F0-9]{32}')):
+                        md5_hash = a["href"].split("/md5/")[1][:32].lower()
+                        if md5_hash in seen_md5:
+                            continue
+                        texts = list(a.stripped_strings)
+                        if not texts:
+                            continue
+                        title_t = texts[0] if len(texts) == 1 else (texts[1] if len(texts) > 1 else texts[0])
+                        meta_line = texts[0] if len(texts) > 1 else ""
+                        ym = re.search(r'\b(19\d\d|20\d\d)\b', " ".join(texts))
+                        book_year = int(ym.group(1)) if ym else None
+                        ext_m = re.search(r'\b(pdf|epub|djvu|mobi)\b', meta_line.lower())
+                        ext_val = ext_m.group(1) if ext_m else "pdf"
+                        seen_md5.add(md5_hash)
+                        raw_books.append({
+                            "md5": md5_hash,
+                            "title": title_t,
+                            "author": texts[2] if len(texts) > 2 else "Autor",
+                            "publisher": "",
+                            "year": book_year or "N/A",
+                            "year_num": book_year,
+                            "language": lang_norm.upper() if lang_norm != "all" else "Unknown",
+                            "pages": "",
+                            "size": "",
+                            "extension": ext_val,
+                            "isbn": "",
+                            "annas_url": f"{aa_mirror}/md5/{md5_hash}",
+                            "direct_resolve_url": f"/api/books/resolve?md5={md5_hash}"
+                        })
+                    if raw_books:
+                        break
+            except Exception:
+                continue
+
+    # 3. Apply User Filters (Language, Year Period, Format/Extension)
+    filtered_books = []
+    for b in raw_books:
+        # Filter by Extension
+        if ext_norm != "all":
+            if b["extension"].lower() != ext_norm:
+                continue
+
+        # Filter by Language
+        if lang_norm != "all":
+            aliases = LANGUAGE_ALIASES.get(lang_norm, [lang_norm])
+            b_lang_lower = (b["language"] or "").lower()
+            if not any(alias in b_lang_lower for alias in aliases):
+                continue
+
+        # Filter by Year Range (year_from .. year_to)
+        b_yr = b.get("year_num")
+        if y_min is not None:
+            if b_yr is None or b_yr < y_min:
+                continue
+        if y_max is not None:
+            if b_yr is None or b_yr > y_max:
+                continue
+
+        # Generate @book citations (BibTeX, RIS, EndNote)
+        bib, ris, enw, cite_key = generate_book_citations(b)
+        b["bibtex"] = bib
+        b["ris"] = ris
+        b["enw"] = enw
+        b["cite_key"] = cite_key
+
+        filtered_books.append(b)
+        if len(filtered_books) >= max_results:
+            break
+
+    return {
+        "success": True,
+        "query": query_clean,
+        "total_found": len(filtered_books),
+        "books": filtered_books
+    }
+
+
+def resolve_book_download_url(md5_hash):
+    """
+    Given a 32-char MD5 book hash, resolves the direct fast download link (GET)
+    from LibGen / Anna's Archive mirrors so the user's browser downloads the PDF/EPUB immediately.
+    """
+    if not md5_hash or not re.match(r'^[a-fA-F0-9]{32}$', md5_hash.strip()):
+        return "https://annas-archive.gl"
+
+    md5_clean = md5_hash.strip().lower()
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+    }
+
+    # 1. Optional Anna's Archive Official Fast Download API if key is set
+    api_key = os.environ.get("ANNAS_ARCHIVE_KEY", "").strip()
+    if api_key:
+        for aa_mirror in ANNAS_ARCHIVE_MIRRORS:
+            try:
+                fast_url = f"{aa_mirror.rstrip('/')}/dyn/api/fast_download.json?md5={md5_clean}&key={api_key}"
+                r = requests.get(fast_url, headers=headers, timeout=8)
+                if r.status_code == 200:
+                    dl = r.json().get("download_url")
+                    if dl:
+                        return dl
+            except Exception:
+                pass
+
+    # 2. Resolve direct GET download link via LibGen mirrors (ads.php -> get.php?md5=...&key=...)
+    for mirror in LIBGEN_BOOK_MIRRORS:
+        mirror = mirror.rstrip("/")
+        try:
+            ads_url = f"{mirror}/ads.php?md5={md5_clean}"
+            r = requests.get(ads_url, headers=headers, timeout=10)
+            if r.status_code == 200:
+                soup = BeautifulSoup(r.text, "html.parser")
+                a_get = soup.find("a", href=lambda h: h and "get.php" in h)
+                if a_get and a_get.get("href"):
+                    href = a_get["href"]
+                    if href.startswith("http"):
+                        return href
+                    return f"{mirror}/{href.lstrip('/')}"
+        except Exception:
+            continue
+
+    # 3. Fallback to Anna's Archive MD5 page where the user can pick any slow/partner server
+    return f"https://annas-archive.gl/md5/{md5_clean}"
+
