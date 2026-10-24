@@ -798,20 +798,113 @@ def generate_book_citations(book):
     return bib, ris, enw, cite_key
 
 
-def search_books_catalog(query, lang="all", year_from=None, year_to=None, ext="all", page=1, max_results=100):
+# In-memory cache for multi-page book catalog queries (query_lower -> {"books": [...], "total_catalog": int})
+BOOK_CATALOG_CACHE = {}
+
+
+def _parse_libgen_table_rows(html_text):
+    """Parse #tablelibgen rows from a LibGen/Anna's Archive catalog HTML page."""
+    soup = BeautifulSoup(html_text, "html.parser")
+    table = soup.find("table", id="tablelibgen")
+    if not table:
+        return []
+
+    parsed_rows = []
+    rows = table.find_all("tr")[1:]
+    for row in rows:
+        tds = row.find_all("td")
+        if len(tds) < 9:
+            continue
+
+        md5_matches = re.findall(r'md5=([a-fA-F0-9]{32})', str(tds[8])) or re.findall(r'/book/([a-fA-F0-9]{32})', str(tds[8]))
+        if not md5_matches:
+            continue
+        md5_hash = md5_matches[0].lower()
+
+        td0 = tds[0]
+        title_text = ""
+        isbn_text = ""
+        a_tags = td0.find_all("a", href=lambda h: h and "edition.php" in h)
+        if a_tags:
+            first_a = a_tags[0]
+            for font_tag in first_a.find_all("font"):
+                isbn_text = font_tag.get_text(" ", strip=True)
+                font_tag.decompose()
+            title_text = first_a.get_text(" ", strip=True)
+            if len(a_tags) > 1 and not isbn_text:
+                isbn_text = a_tags[1].get_text(" ", strip=True)
+        else:
+            title_text = td0.get_text(" ", strip=True)
+
+        if not title_text:
+            continue
+
+        author_text = tds[1].get_text(" ", strip=True) or "Autor desconocido"
+        publisher_text = tds[2].get_text(" ", strip=True) or ""
+        year_raw = tds[3].get_text(" ", strip=True) or ""
+        lang_raw = tds[4].get_text(" ", strip=True) or ""
+        pages_raw = tds[5].get_text(" ", strip=True) or ""
+        size_raw = tds[6].get_text(" ", strip=True) or ""
+        ext_raw = tds[7].get_text(" ", strip=True).lower() or "pdf"
+
+        ym = re.search(r'\b(18\d\d|19\d\d|20\d\d)\b', year_raw)
+        book_year = int(ym.group(1)) if ym else None
+
+        item = {
+            "md5": md5_hash,
+            "title": title_text,
+            "author": author_text,
+            "publisher": publisher_text,
+            "year": book_year if book_year else (year_raw or "N/A"),
+            "year_num": book_year,
+            "language": lang_raw or "Unknown",
+            "pages": pages_raw,
+            "size": size_raw,
+            "extension": ext_raw,
+            "isbn": isbn_text,
+            "annas_url": f"https://annas-archive.gl/md5/{md5_hash}",
+            "direct_resolve_url": f"/api/books/resolve?md5={md5_hash}"
+        }
+        bib, ris, enw, cite_key = generate_book_citations(item)
+        item["bibtex"] = bib
+        item["ris"] = ris
+        item["enw"] = enw
+        item["cite_key"] = cite_key
+        parsed_rows.append(item)
+
+    return parsed_rows
+
+
+def search_books_catalog(query, lang="all", year_from=None, year_to=None, ext="all", page=1, page_size=25, max_pages_fetch=10):
     """
     Search unified book catalog (Anna's Archive / Z-Library / LibGen MD5 index).
-    Supports filtering by language, year range (year_from..year_to), file extension (pdf, epub, etc.), and pagination.
+    Collects multi-page catalog results concurrently, applies filters across the ENTIRE dataset,
+    recalculates filtered totals, and slices according to page_size (10, 25, 50, 100, or 'all').
     """
     from urllib.parse import quote
+    from concurrent.futures import ThreadPoolExecutor
+    import math
+
     if not query or not query.strip():
-        return {"success": False, "books": [], "error": "Empty query"}
+        return {"success": False, "books": [], "all_books": [], "error": "Empty query"}
 
     query_clean = query.strip()
+    query_key = query_clean.lower()
+
     try:
         page_num = max(1, int(page or 1))
     except ValueError:
         page_num = 1
+
+    # Normalize page_size ('all' or integer 10, 25, 50, 100)
+    page_size_str = str(page_size or 25).strip().lower()
+    if page_size_str in ("all", "todos", "0", "-1"):
+        per_page = None  # All items on 1 page
+    else:
+        try:
+            per_page = max(1, int(page_size_str))
+        except ValueError:
+            per_page = 25
 
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
@@ -834,175 +927,149 @@ def search_books_catalog(query, lang="all", year_from=None, year_to=None, ext="a
     lang_norm = (lang or "all").strip().lower()
     ext_norm = (ext or "all").strip().lower()
 
-    raw_books = []
-    seen_md5 = set()
-    total_catalog_results = 0
-    total_pages = 1
+    # Check in-memory query cache first
+    if query_key in BOOK_CATALOG_CACHE:
+        cached = BOOK_CATALOG_CACHE[query_key]
+        raw_books = cached["books"]
+        total_catalog_results = cached["total_catalog"]
+    else:
+        raw_books = []
+        seen_md5 = set()
+        total_catalog_results = 0
+        catalog_raw_pages = 1
 
-    # 1. Primary Unified Catalog Search (LibGen / Anna's Archive MD5 Index)
-    for mirror in LIBGEN_BOOK_MIRRORS:
-        mirror = mirror.rstrip("/")
-        # Search books (topics[]=l for Sci-Tech/Academic Books, topics[]=f for General/Fiction Books)
-        search_url = (
-            f"{mirror}/index.php?req={quote(query_clean)}"
-            f"&columns[]=t&columns[]=a&columns[]=s&columns[]=y&columns[]=p&columns[]=i"
-            f"&objects[]=f&topics[]=l&topics[]=f&res=100&page={page_num}"
-        )
-        try:
-            r = requests.get(search_url, headers=headers, timeout=12)
-            if r.status_code != 200:
-                continue
-
-            # Extract total catalog count (e.g. Files <span class="badge badge-primary">601</span>)
-            m_files = re.search(r'Files\s*<span[^>]*>(\d+)</span>', r.text, re.I)
-            if m_files:
-                total_catalog_results = int(m_files.group(1))
-
-            # Extract total pages from Paginator("paginator_example_top", total_pages, max_visible, current_page, ...)
-            m_pag = re.search(r'Paginator\(\s*["\']paginator_example_top["\']\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)', r.text)
-            if m_pag:
-                total_pages = max(1, int(m_pag.group(1)))
-            elif total_catalog_results > 0:
-                total_pages = max(1, (total_catalog_results + 24) // 25)
-
-            soup = BeautifulSoup(r.text, "html.parser")
-            table = soup.find("table", id="tablelibgen")
-            if not table:
-                continue
-
-            rows = table.find_all("tr")[1:]
-            for row in rows:
-                tds = row.find_all("td")
-                if len(tds) < 9:
-                    continue
-
-                # Extract MD5
-                md5_matches = re.findall(r'md5=([a-fA-F0-9]{32})', str(tds[8])) or re.findall(r'/book/([a-fA-F0-9]{32})', str(tds[8]))
-                if not md5_matches:
-                    continue
-                md5_hash = md5_matches[0].lower()
-                if md5_hash in seen_md5:
-                    continue
-
-                # Extract Title & ISBN from td[0]
-                td0 = tds[0]
-                title_text = ""
-                isbn_text = ""
-                a_tags = td0.find_all("a", href=lambda h: h and "edition.php" in h)
-                if a_tags:
-                    # First edition.php link is the title; second (if green font) is ISBN
-                    first_a = a_tags[0]
-                    # Remove green ISBN font if nested
-                    for font_tag in first_a.find_all("font"):
-                        isbn_text = font_tag.get_text(" ", strip=True)
-                        font_tag.decompose()
-                    title_text = first_a.get_text(" ", strip=True)
-                    if len(a_tags) > 1 and not isbn_text:
-                        isbn_text = a_tags[1].get_text(" ", strip=True)
-                else:
-                    title_text = td0.get_text(" ", strip=True)
-
-                if not title_text:
-                    continue
-
-                author_text = tds[1].get_text(" ", strip=True) or "Autor desconocido"
-                publisher_text = tds[2].get_text(" ", strip=True) or ""
-                year_raw = tds[3].get_text(" ", strip=True) or ""
-                lang_raw = tds[4].get_text(" ", strip=True) or ""
-                pages_raw = tds[5].get_text(" ", strip=True) or ""
-                size_raw = tds[6].get_text(" ", strip=True) or ""
-                ext_raw = tds[7].get_text(" ", strip=True).lower() or "pdf"
-
-                # Extract 4-digit year
-                ym = re.search(r'\b(18\d\d|19\d\d|20\d\d)\b', year_raw)
-                book_year = int(ym.group(1)) if ym else None
-
-                seen_md5.add(md5_hash)
-                raw_books.append({
-                    "md5": md5_hash,
-                    "title": title_text,
-                    "author": author_text,
-                    "publisher": publisher_text,
-                    "year": book_year if book_year else (year_raw or "N/A"),
-                    "year_num": book_year,
-                    "language": lang_raw or "Unknown",
-                    "pages": pages_raw,
-                    "size": size_raw,
-                    "extension": ext_raw,
-                    "isbn": isbn_text,
-                    "annas_url": f"https://annas-archive.gl/md5/{md5_hash}",
-                    "direct_resolve_url": f"/api/books/resolve?md5={md5_hash}"
-                })
-
-            if raw_books:
-                break
-        except Exception:
-            continue
-
-    # 2. Secondary Fallback: Direct Anna's Archive HTML Search if primary mirrors were unreachable
-    if not raw_books:
-        for aa_mirror in ANNAS_ARCHIVE_MIRRORS:
-            aa_mirror = aa_mirror.rstrip("/")
-            aa_url = f"{aa_mirror}/search?q={quote(query_clean)}&content=book_any"
-            if lang_norm != "all":
-                aa_url += f"&lang={quote(lang_norm)}"
-            if ext_norm != "all":
-                aa_url += f"&ext={quote(ext_norm)}"
+        # 1. Primary Unified Catalog Search (LibGen / Anna's Archive MD5 Index)
+        for mirror in LIBGEN_BOOK_MIRRORS:
+            mirror = mirror.rstrip("/")
+            base_url = (
+                f"{mirror}/index.php?req={quote(query_clean)}"
+                f"&columns[]=t&columns[]=a&columns[]=s&columns[]=y&columns[]=p&columns[]=i"
+                f"&objects[]=f&topics[]=l&topics[]=f&res=100"
+            )
             try:
-                r_aa = requests.get(aa_url, headers=headers, timeout=12)
-                if r_aa.status_code == 200 and "/md5/" in r_aa.text:
-                    clean_html = r_aa.text.replace("<!--", "").replace("-->", "")
-                    soup_aa = BeautifulSoup(clean_html, "html.parser")
-                    for a in soup_aa.find_all("a", href=re.compile(r'^/md5/[a-fA-F0-9]{32}')):
-                        md5_hash = a["href"].split("/md5/")[1][:32].lower()
-                        if md5_hash in seen_md5:
-                            continue
-                        texts = list(a.stripped_strings)
-                        if not texts:
-                            continue
-                        title_t = texts[0] if len(texts) == 1 else (texts[1] if len(texts) > 1 else texts[0])
-                        meta_line = texts[0] if len(texts) > 1 else ""
-                        ym = re.search(r'\b(19\d\d|20\d\d)\b', " ".join(texts))
-                        book_year = int(ym.group(1)) if ym else None
-                        ext_m = re.search(r'\b(pdf|epub|djvu|mobi)\b', meta_line.lower())
-                        ext_val = ext_m.group(1) if ext_m else "pdf"
-                        seen_md5.add(md5_hash)
-                        raw_books.append({
-                            "md5": md5_hash,
-                            "title": title_t,
-                            "author": texts[2] if len(texts) > 2 else "Autor",
-                            "publisher": "",
-                            "year": book_year or "N/A",
-                            "year_num": book_year,
-                            "language": lang_norm.upper() if lang_norm != "all" else "Unknown",
-                            "pages": "",
-                            "size": "",
-                            "extension": ext_val,
-                            "isbn": "",
-                            "annas_url": f"{aa_mirror}/md5/{md5_hash}",
-                            "direct_resolve_url": f"/api/books/resolve?md5={md5_hash}"
-                        })
-                    if raw_books:
-                        break
+                session = requests.Session()
+                session.headers.update(headers)
+                r1 = session.get(f"{base_url}&page=1", timeout=12)
+                if r1.status_code != 200:
+                    continue
+
+                m_files = re.search(r'Files\s*<span[^>]*>(\d+)</span>', r1.text, re.I)
+                if m_files:
+                    total_catalog_results = int(m_files.group(1))
+
+                m_pag = re.search(r'Paginator\(\s*["\']paginator_example_top["\']\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)', r1.text)
+                if m_pag:
+                    catalog_raw_pages = max(1, int(m_pag.group(1)))
+                elif total_catalog_results > 0:
+                    catalog_raw_pages = max(1, (total_catalog_results + 24) // 25)
+
+                page1_books = _parse_libgen_table_rows(r1.text)
+                for b in page1_books:
+                    if b["md5"] not in seen_md5:
+                        seen_md5.add(b["md5"])
+                        raw_books.append(b)
+
+                # Fetch remaining pages concurrently (up to max_pages_fetch pages = 250 books)
+                pages_to_fetch = min(catalog_raw_pages, max_pages_fetch)
+                if pages_to_fetch > 1 and raw_books:
+                    extra_urls = [f"{base_url}&page={p}" for p in range(2, pages_to_fetch + 1)]
+
+                    def _fetch_page(u):
+                        try:
+                            resp = session.get(u, timeout=10)
+                            if resp.status_code == 200:
+                                return _parse_libgen_table_rows(resp.text)
+                        except Exception:
+                            pass
+                        return []
+
+                    with ThreadPoolExecutor(max_workers=6) as pool:
+                        for page_items in pool.map(_fetch_page, extra_urls):
+                            for b in page_items:
+                                if b["md5"] not in seen_md5:
+                                    seen_md5.add(b["md5"])
+                                    raw_books.append(b)
+
+                if raw_books:
+                    break
             except Exception:
                 continue
 
-    # 3. Apply User Filters (Language, Year Period, Format/Extension)
+        # 2. Secondary Fallback: Direct Anna's Archive HTML Search if primary mirrors were unreachable
+        if not raw_books:
+            for aa_mirror in ANNAS_ARCHIVE_MIRRORS:
+                aa_mirror = aa_mirror.rstrip("/")
+                aa_url = f"{aa_mirror}/search?q={quote(query_clean)}&content=book_any"
+                try:
+                    r_aa = requests.get(aa_url, headers=headers, timeout=12)
+                    if r_aa.status_code == 200 and "/md5/" in r_aa.text:
+                        clean_html = r_aa.text.replace("<!--", "").replace("-->", "")
+                        soup_aa = BeautifulSoup(clean_html, "html.parser")
+                        for a in soup_aa.find_all("a", href=re.compile(r'^/md5/[a-fA-F0-9]{32}')):
+                            md5_hash = a["href"].split("/md5/")[1][:32].lower()
+                            if md5_hash in seen_md5:
+                                continue
+                            texts = list(a.stripped_strings)
+                            if not texts:
+                                continue
+                            title_t = texts[0] if len(texts) == 1 else (texts[1] if len(texts) > 1 else texts[0])
+                            meta_line = texts[0] if len(texts) > 1 else ""
+                            ym = re.search(r'\b(19\d\d|20\d\d)\b', " ".join(texts))
+                            book_year = int(ym.group(1)) if ym else None
+                            ext_m = re.search(r'\b(pdf|epub|djvu|mobi)\b', meta_line.lower())
+                            ext_val = ext_m.group(1) if ext_m else "pdf"
+                            seen_md5.add(md5_hash)
+                            item = {
+                                "md5": md5_hash,
+                                "title": title_t,
+                                "author": texts[2] if len(texts) > 2 else "Autor",
+                                "publisher": "",
+                                "year": book_year or "N/A",
+                                "year_num": book_year,
+                                "language": "Unknown",
+                                "pages": "",
+                                "size": "",
+                                "extension": ext_val,
+                                "isbn": "",
+                                "annas_url": f"{aa_mirror}/md5/{md5_hash}",
+                                "direct_resolve_url": f"/api/books/resolve?md5={md5_hash}"
+                            }
+                            bib, ris, enw, cite_key = generate_book_citations(item)
+                            item["bibtex"] = bib
+                            item["ris"] = ris
+                            item["enw"] = enw
+                            item["cite_key"] = cite_key
+                            raw_books.append(item)
+                        if raw_books:
+                            break
+                except Exception:
+                    continue
+
+        if total_catalog_results == 0 and raw_books:
+            total_catalog_results = len(raw_books)
+
+        if raw_books:
+            if len(BOOK_CATALOG_CACHE) >= 25:
+                oldest_key = next(iter(BOOK_CATALOG_CACHE))
+                BOOK_CATALOG_CACHE.pop(oldest_key, None)
+            BOOK_CATALOG_CACHE[query_key] = {
+                "books": raw_books,
+                "total_catalog": total_catalog_results
+            }
+
+    # 3. Apply User Filters across the ENTIRE collected dataset
     filtered_books = []
     for b in raw_books:
-        # Filter by Extension
         if ext_norm != "all":
             if b["extension"].lower() != ext_norm:
                 continue
 
-        # Filter by Language
         if lang_norm != "all":
             aliases = LANGUAGE_ALIASES.get(lang_norm, [lang_norm])
             b_lang_lower = (b["language"] or "").lower()
             if not any(alias in b_lang_lower for alias in aliases):
                 continue
 
-        # Filter by Year Range (year_from .. year_to)
         b_yr = b.get("year_num")
         if y_min is not None:
             if b_yr is None or b_yr < y_min:
@@ -1011,30 +1078,34 @@ def search_books_catalog(query, lang="all", year_from=None, year_to=None, ext="a
             if b_yr is None or b_yr > y_max:
                 continue
 
-        # Generate @book citations (BibTeX, RIS, EndNote)
-        bib, ris, enw, cite_key = generate_book_citations(b)
-        b["bibtex"] = bib
-        b["ris"] = ris
-        b["enw"] = enw
-        b["cite_key"] = cite_key
-
         filtered_books.append(b)
-        if len(filtered_books) >= max_results:
-            break
 
-    if total_catalog_results == 0 and raw_books:
-        total_catalog_results = len(raw_books)
+    # 4. Exact Pagination over Filtered Results
+    total_filtered = len(filtered_books)
+    if per_page is None:
+        total_pages = 1
+        page_num = 1
+        paginated_books = filtered_books
+    else:
+        total_pages = max(1, math.ceil(total_filtered / per_page)) if total_filtered > 0 else 1
+        if page_num > total_pages:
+            page_num = total_pages
+        start_idx = (page_num - 1) * per_page
+        end_idx = start_idx + per_page
+        paginated_books = filtered_books[start_idx:end_idx]
 
     return {
         "success": True,
         "query": query_clean,
         "page": page_num,
         "total_pages": total_pages,
-        "per_page": 25,
+        "per_page": "all" if per_page is None else per_page,
         "total_catalog_results": total_catalog_results,
+        "total_filtered": total_filtered,
+        "total_found": len(paginated_books),
         "has_more": page_num < total_pages,
-        "total_found": len(filtered_books),
-        "books": filtered_books
+        "books": paginated_books,
+        "all_books": raw_books
     }
 
 
