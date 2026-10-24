@@ -192,6 +192,47 @@ def download_paper_cascaded(doi, output_dir="downloads", filename=None):
         except Exception:
             continue
 
+    # 5. Anna's Archive (SciDB / Z-Library / LibGen / IPFS)
+    from urllib.parse import quote
+    for aa_mirror in ["https://annas-archive.org", "https://annas-archive.se", "https://annas-archive.li"]:
+        try:
+            r_scidb = requests.get(f"{aa_mirror}/scidb/{cleaned_id}", headers=headers, timeout=15)
+            if r_scidb.status_code == 200:
+                if b"%PDF" in r_scidb.content[:1024]:
+                    with open(output_path, "wb") as f:
+                        f.write(r_scidb.content)
+                    return {"success": True, "source": "Anna's Archive (SciDB)", "path": os.path.abspath(output_path)}
+                soup_aa = BeautifulSoup(r_scidb.text, "html.parser")
+                a_pdf = soup_aa.find("a", href=lambda h: h and (".pdf" in h.lower() or "ipfs" in h.lower()))
+                if a_pdf and a_pdf.get("href"):
+                    link = a_pdf["href"]
+                    if link.startswith("//"):
+                        link = "https:" + link
+                    elif link.startswith("/"):
+                        link = aa_mirror + link
+                    if download_pdf_from_url(link, output_path):
+                        return {"success": True, "source": "Anna's Archive (SciDB)", "path": os.path.abspath(output_path)}
+
+            r_search = requests.get(f"{aa_mirror}/search?q={quote(cleaned_id)}", headers=headers, timeout=15)
+            if r_search.status_code == 200:
+                md5s = re.findall(r'/md5/([a-fA-F0-9]{32})', r_search.text)
+                if md5s:
+                    md5_hash = md5s[0].lower()
+                    r_md5 = requests.get(f"{aa_mirror}/md5/{md5_hash}", headers=headers, timeout=15)
+                    if r_md5.status_code == 200:
+                        soup_md5 = BeautifulSoup(r_md5.text, "html.parser")
+                        for a in soup_md5.find_all("a", href=True):
+                            href = a["href"]
+                            if any(k in href.lower() for k in ["ipfs", "library.lol", "libgen", ".pdf"]):
+                                if href.startswith("//"):
+                                    href = "https:" + href
+                                elif href.startswith("/"):
+                                    href = aa_mirror + href
+                                if download_pdf_from_url(href, output_path):
+                                    return {"success": True, "source": "Anna's Archive (Z-Lib/LibGen)", "path": os.path.abspath(output_path)}
+        except Exception:
+            continue
+
     return {"success": False, "error": f"Could not find or download PDF for {doi}"}
 
 # --- 3. PYPAPERBOT RUNNER ---

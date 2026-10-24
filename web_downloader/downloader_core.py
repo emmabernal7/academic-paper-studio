@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 Downloader Core Module for Academic Paper Studio.
-Handles metadata resolution (Crossref), cascaded PDF downloading (OA, Sci-Hub, PyPaperBot),
-BibTeX generation, and Zotero synchronization.
+Handles metadata resolution (Crossref), 7-tier cascaded PDF downloading (OA, Sci-Hub, Anna's Archive),
+BibTeX/RIS/EndNote generation, and Zotero synchronization.
 """
 
 import os
@@ -18,6 +18,12 @@ SCI_HUB_DEFAULT_MIRRORS = [
     "https://sci-hub.ru",
     "https://sci-hub.st",
     "https://sci-hub.se"
+]
+
+ANNAS_ARCHIVE_MIRRORS = [
+    "https://annas-archive.org",
+    "https://annas-archive.se",
+    "https://annas-archive.li"
 ]
 
 def sanitize_filename(text, max_len=60):
@@ -293,6 +299,108 @@ def try_download_scihub(doi, output_path, mirrors=None):
 
     return {"success": False}
 
+def try_annas_archive(doi, output_path):
+    """
+    Tier 7: Query Anna's Archive (SciDB + Z-Library / LibGen / IPFS index) for DOI.
+    Tries:
+      1. Anna's Archive SciDB direct DOI page (/scidb/{doi})
+      2. Anna's Archive unified search (/search?q={doi}) -> MD5 page -> IPFS / LibGen / Fast API links
+    """
+    from urllib.parse import quote
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+    }
+    api_key = os.environ.get("ANNAS_ARCHIVE_KEY", "").strip()
+
+    for mirror in ANNAS_ARCHIVE_MIRRORS:
+        mirror = mirror.rstrip("/")
+        # 1. Try SciDB direct endpoint on Anna's Archive
+        try:
+            scidb_url = f"{mirror}/scidb/{doi}"
+            r = requests.get(scidb_url, headers=headers, timeout=15)
+            if r.status_code == 200:
+                if b"%PDF" in r.content[:1024]:
+                    with open(output_path, "wb") as f:
+                        f.write(r.content)
+                    return {"success": True, "source": f"Anna's Archive (SciDB)"}
+
+                soup = BeautifulSoup(r.text, "html.parser")
+                pdf_url = None
+                embed = soup.find("embed", type="application/pdf") or soup.find("iframe", src=True) or soup.find("object", type="application/pdf")
+                if embed:
+                    pdf_url = embed.get("src") or embed.get("data")
+                if not pdf_url:
+                    a_tag = soup.find("a", href=lambda h: h and (".pdf" in h.lower() or "ipfs" in h.lower() or "download" in h.lower()))
+                    if a_tag:
+                        pdf_url = a_tag["href"]
+                if pdf_url:
+                    if pdf_url.startswith("//"):
+                        pdf_url = "https:" + pdf_url
+                    elif pdf_url.startswith("/"):
+                        pdf_url = mirror + pdf_url
+                    if download_pdf_from_url(pdf_url, output_path, headers=headers):
+                        return {"success": True, "source": "Anna's Archive (SciDB)"}
+        except Exception:
+            pass
+
+        # 2. Try Anna's Archive Unified Search (indexes Z-Library, LibGen, Sci-Hub)
+        try:
+            search_url = f"{mirror}/search?q={quote(doi)}"
+            r_search = requests.get(search_url, headers=headers, timeout=15)
+            if r_search.status_code == 200:
+                md5_matches = re.findall(r'/md5/([a-fA-F0-9]{32})', r_search.text)
+                if md5_matches:
+                    md5_hash = md5_matches[0].lower()
+
+                    # 2a. Optional Official Fast Download API if key is configured
+                    if api_key:
+                        fast_api = f"{mirror}/dyn/api/fast_download.json?md5={md5_hash}&key={api_key}"
+                        r_fast = requests.get(fast_api, headers=headers, timeout=12)
+                        if r_fast.status_code == 200:
+                            dl_url = r_fast.json().get("download_url")
+                            if dl_url and download_pdf_from_url(dl_url, output_path, headers=headers):
+                                return {"success": True, "source": "Anna's Archive (Fast API / Z-Lib)"}
+
+                    # 2b. Parse MD5 details page for IPFS / LibGen / Z-Lib mirror links
+                    md5_url = f"{mirror}/md5/{md5_hash}"
+                    r_md5 = requests.get(md5_url, headers=headers, timeout=15)
+                    if r_md5.status_code == 200:
+                        soup_md5 = BeautifulSoup(r_md5.text, "html.parser")
+                        candidate_links = []
+                        for a in soup_md5.find_all("a", href=True):
+                            href = a["href"]
+                            if any(k in href.lower() for k in ["ipfs", "library.lol", "libgen", ".pdf", "slow_download"]):
+                                if href.startswith("//"):
+                                    href = "https:" + href
+                                elif href.startswith("/"):
+                                    href = mirror + href
+                                candidate_links.append(href)
+
+                        for link in candidate_links[:5]:
+                            if download_pdf_from_url(link, output_path, headers=headers):
+                                return {"success": True, "source": "Anna's Archive (Z-Lib/LibGen)"}
+                            # If link is a LibGen/library.lol landing page, extract its direct GET link
+                            try:
+                                if "library.lol" in link or "libgen" in link:
+                                    r_lg = requests.get(link, headers=headers, timeout=12)
+                                    if r_lg.status_code == 200:
+                                        soup_lg = BeautifulSoup(r_lg.text, "html.parser")
+                                        get_a = soup_lg.find("a", href=lambda h: h and ("get.php" in h or ".pdf" in h.lower() or "ipfs" in h.lower()))
+                                        if get_a and get_a.get("href"):
+                                            dl_link = get_a["href"]
+                                            if dl_link.startswith("/"):
+                                                from urllib.parse import urlparse
+                                                p = urlparse(link)
+                                                dl_link = f"{p.scheme}://{p.netloc}{dl_link}"
+                                            if download_pdf_from_url(dl_link, output_path, headers=headers):
+                                                return {"success": True, "source": "Anna's Archive (LibGen/Z-Lib)"}
+                            except Exception:
+                                pass
+        except Exception:
+            continue
+
+    return {"success": False}
+
 def generate_bibtex_entry(meta):
     """Format metadata into standard BibTeX entry."""
     first_author_clean = sanitize_filename(meta.get("first_author", "Unknown"), 20)
@@ -517,6 +625,13 @@ def process_batch(dois, options, progress_callback=None, output_dir="downloads")
             if res_scihub.get("success"):
                 downloaded = True
                 source_used = f"Sci-Hub ({res_scihub.get('source', '')})"
+
+        # Tier 7: Anna's Archive (SciDB / Z-Library / LibGen / IPFS)
+        if not downloaded:
+            res_annas = try_annas_archive(doi, pdf_path)
+            if res_annas.get("success"):
+                downloaded = True
+                source_used = res_annas["source"]
 
         if downloaded and os.path.exists(pdf_path):
             size = os.path.getsize(pdf_path)

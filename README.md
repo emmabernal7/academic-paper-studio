@@ -13,7 +13,7 @@
   4. **Europe PMC / PubMed Central**: Direct open access biomedical paper fetching.
   5. **Preprint Resolvers**: Automatic resolution for arXiv, bioRxiv, and medRxiv.
   6. **Sci-Hub Multi-Mirror Network**: Resilient fallback for paywalled pre-2021 literature.
-  7. **PyPaperBot Fallback**: SciDB / Anna's Archive search.
+  7. **Anna's Archive Engine (SciDB / Z-Library / LibGen / IPFS)**: Native fallback for post-2021 paywalled articles, book chapters, and scientific books.
 
 - **📑 Multi-Format Citation Generator**:
   - Automatically generates `.bib` (BibTeX), `.ris` (EndNote / Mendeley / Zotero), and `.enw` (EndNote Web) files for each paper.
@@ -32,7 +32,6 @@
   - `academic-paper-toolkit`: CLI and programmatic API for AI agents.
   - `scientific-plotting`: Publication-quality figures (Nature, Science, Cell standards).
   - `latex-paper-assistant`: LaTeX paper structure, BibTeX management, and compilation.
-  - `find-skills`: Skill discovery and installation.
 
 ---
 
@@ -63,15 +62,15 @@ Open your browser at **[http://localhost:8765](http://localhost:8765)**.
 │   └── skills/
 │       ├── academic-paper-toolkit/   # Core academic agent skill & tools
 │       ├── scientific-plotting/      # Publication-quality plotting skill
-│       ├── latex-paper-assistant/    # Academic paper LaTeX assistant
-│       └── find-skills/              # Skill manager
+│       └── latex-paper-assistant/    # Academic paper LaTeX assistant
 ├── web_downloader/
 │   ├── app.py                        # Local lightweight Python HTTP server
-│   ├── downloader_core.py            # Multi-engine OA cascade & citation logic
+│   ├── downloader_core.py            # 7-tier OA/Sci-Hub/Anna's Archive cascade & citation logic
 │   ├── static/
 │   │   └── index.html                # Responsive web frontend (ES / EN)
 │   └── downloads/                    # Target directory for PDFs & citations
 ├── requirements.txt                  # Python dependencies
+├── render.yaml                       # Cloud deployment blueprint
 ├── iniciar_descargador.bat           # 1-click Windows launcher
 └── README.md
 ```
@@ -84,6 +83,7 @@ You can set these in your environment or via a `.env` file:
 
 ```bash
 UNPAYWALL_EMAIL=your_email@domain.com    # Recommended for Unpaywall higher rate limits
+ANNAS_ARCHIVE_KEY=your_secret_key        # Optional: for Anna's Archive Fast Download API
 ZOTERO_API_KEY=your_zotero_api_key       # If using Zotero sync
 ZOTERO_USER_ID=your_zotero_user_id       # Your Zotero numerical ID
 ```
