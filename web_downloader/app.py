@@ -232,13 +232,15 @@ class AcademicStudioHandler(SimpleHTTPRequestHandler):
                 year_from = data.get("year_from", "")
                 year_to = data.get("year_to", "")
                 ext = data.get("ext", "all")
+                page = data.get("page", 1)
 
                 res = search_books_catalog(
                     query=query,
                     lang=lang,
                     year_from=year_from,
                     year_to=year_to,
-                    ext=ext
+                    ext=ext,
+                    page=page
                 )
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json; charset=utf-8")

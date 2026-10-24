@@ -394,18 +394,44 @@
       <div class="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm dark:shadow-xl overflow-hidden transition-colors">
         <div class="overflow-x-auto max-h-[600px] custom-scrollbar">
           <table class="w-full text-left text-xs">
-            <thead class="bg-slate-50 dark:bg-slate-950/80 text-slate-500 dark:text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800 sticky top-0">
+            <thead class="bg-slate-50 dark:bg-slate-950/80 text-slate-500 dark:text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800 sticky top-0 z-10 select-none">
               <tr>
-                <th class="px-4 py-3" data-i18n="th_book_title">Título, Autor &amp; Editorial</th>
-                <th class="px-3 py-3 text-center" data-i18n="th_year">Año</th>
-                <th class="px-3 py-3 text-center" data-i18n="th_book_lang">Idioma</th>
-                <th class="px-3 py-3 text-center" data-i18n="th_book_format">Formato / Tamaño</th>
+                <th onclick="sortBooksBy('title')" class="px-4 py-3 cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition group" title="Clic para ordenar por Título (A-Z / Z-A)">
+                  <div class="inline-flex items-center space-x-1">
+                    <span data-i18n="th_book_title">Título &amp; Editorial</span>
+                    <span id="sortIcon_title" class="text-slate-400 group-hover:text-indigo-500 font-bold">↕</span>
+                  </div>
+                </th>
+                <th onclick="sortBooksBy('author')" class="px-3 py-3 cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition group" title="Clic para ordenar por Autor (A-Z / Z-A)">
+                  <div class="inline-flex items-center space-x-1">
+                    <span data-i18n="th_book_author">Autor</span>
+                    <span id="sortIcon_author" class="text-slate-400 group-hover:text-indigo-500 font-bold">↕</span>
+                  </div>
+                </th>
+                <th onclick="sortBooksBy('year')" class="px-3 py-3 text-center cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition group" title="Clic para ordenar por Año">
+                  <div class="inline-flex items-center justify-center space-x-1">
+                    <span data-i18n="th_year">Año</span>
+                    <span id="sortIcon_year" class="text-slate-400 group-hover:text-indigo-500 font-bold">↕</span>
+                  </div>
+                </th>
+                <th onclick="sortBooksBy('language')" class="px-3 py-3 text-center cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition group" title="Clic para ordenar por Idioma (A-Z / Z-A)">
+                  <div class="inline-flex items-center justify-center space-x-1">
+                    <span data-i18n="th_book_lang">Idioma</span>
+                    <span id="sortIcon_language" class="text-slate-400 group-hover:text-indigo-500 font-bold">↕</span>
+                  </div>
+                </th>
+                <th onclick="sortBooksBy('extension')" class="px-3 py-3 text-center cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition group" title="Clic para ordenar por Formato">
+                  <div class="inline-flex items-center justify-center space-x-1">
+                    <span data-i18n="th_book_format">Formato / Tamaño</span>
+                    <span id="sortIcon_extension" class="text-slate-400 group-hover:text-indigo-500 font-bold">↕</span>
+                  </div>
+                </th>
                 <th class="px-4 py-3 text-right" data-i18n="th_actions">Acciones</th>
               </tr>
             </thead>
             <tbody id="booksTableBody" class="divide-y divide-slate-200 dark:divide-slate-800/60">
               <tr>
-                <td colspan="5" class="px-6 py-14 text-center text-slate-400 dark:text-slate-500">
+                <td colspan="6" class="px-6 py-14 text-center text-slate-400 dark:text-slate-500">
                   <div class="text-3xl mb-2">🏛️</div>
                   <p class="font-medium" data-i18n="books_empty_title">Buscador de Libros Anna's Archive / Z-Library</p>
                   <p class="text-[11px] text-slate-400 dark:text-slate-600 mt-0.5" data-i18n="books_empty_desc">Escribe el nombre del libro a la izquierda, ajusta el idioma o rango de años y presiona Buscar.</p>
@@ -413,6 +439,19 @@
               </tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- PAGINATION BAR FOR BOOKS CATALOG -->
+        <div id="bookPaginationBar" class="hidden px-5 py-3 bg-slate-50/70 dark:bg-slate-950/50 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs">
+          <button id="btnPrevBookPage" onclick="changeBookPage(-1)" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:border-indigo-500 font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed" data-i18n="btn_prev_page">
+            ⬅️ Página Anterior
+          </button>
+          <div class="font-semibold text-slate-600 dark:text-slate-300">
+            <span data-i18n="page_label">Página del catálogo</span> <span id="bookCurrentPageNum" class="px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-mono">1</span>
+          </div>
+          <button id="btnNextBookPage" onclick="changeBookPage(1)" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:border-indigo-500 font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed" data-i18n="btn_next_page">
+            Página Siguiente ➡️
+          </button>
         </div>
       </div>
 
@@ -481,9 +520,13 @@
         books_info_note: "💡 Conectado al índice unificado de <strong>Anna's Archive (Z-Library &amp; LibGen)</strong>. Descarga libros completos en PDF/EPUB y genera sus citas bibliográficas <code>@book</code>.",
         books_waiting_status: "Ingresa el nombre de un libro para buscar en el catálogo",
         btn_copy_book_citations: "Copiar Citas (@book)",
-        th_book_title: "Título, Autor & Editorial",
+        th_book_title: "Título & Editorial",
+        th_book_author: "Autor",
         th_book_lang: "Idioma",
         th_book_format: "Formato / Tamaño",
+        btn_prev_page: "⬅️ Página Anterior",
+        btn_next_page: "Página Siguiente ➡️",
+        page_label: "Página del catálogo",
         books_empty_title: "Buscador de Libros Anna's Archive / Z-Library",
         books_empty_desc: "Escribe el nombre del libro a la izquierda, ajusta el idioma o rango de años y presiona Buscar.",
         books_no_results: "No se encontraron libros con esos filtros. Intenta ampliar el rango de años o cambiar el idioma.",
@@ -574,9 +617,13 @@
         books_info_note: "💡 Connected to the unified <strong>Anna's Archive (Z-Library &amp; LibGen)</strong> index. Download full books in PDF/EPUB and generate <code>@book</code> citations.",
         books_waiting_status: "Enter a book title to search the catalog",
         btn_copy_book_citations: "Copy Citations (@book)",
-        th_book_title: "Title, Author & Publisher",
+        th_book_title: "Title & Publisher",
+        th_book_author: "Author",
         th_book_lang: "Language",
         th_book_format: "Format / Size",
+        btn_prev_page: "⬅️ Previous Page",
+        btn_next_page: "Next Page ➡️",
+        page_label: "Catalog Page",
         books_empty_title: "Anna's Archive / Z-Library Book Searcher",
         books_empty_desc: "Type the book name on the left, adjust language or year range, and click Search.",
         books_no_results: "No books found matching those filters. Try widening the year range or changing language.",
@@ -1050,6 +1097,10 @@
     // --- BOOK DOWNLOADER MODE LOGIC (Anna's Archive / Z-Library / LibGen) ---
     let currentAppMode = 'papers';
     let currentBookResults = [];
+    let currentBookPage = 1;
+    let currentBookQuery = '';
+    let bookSortField = null;
+    let bookSortAsc = true;
 
     function switchAppMode(mode) {
       currentAppMode = mode;
@@ -1079,6 +1130,49 @@
       document.getElementById('bookYearTo').value = toYr;
     }
 
+    function resetBookSortIcons() {
+      ['title', 'author', 'year', 'language', 'extension'].forEach(col => {
+        const el = document.getElementById('sortIcon_' + col);
+        if (el) {
+          el.textContent = '↕';
+          el.className = 'text-slate-400 group-hover:text-indigo-500 font-bold';
+        }
+      });
+    }
+
+    function sortBooksBy(field) {
+      if (!currentBookResults || currentBookResults.length === 0) return;
+
+      if (bookSortField === field) {
+        bookSortAsc = !bookSortAsc;
+      } else {
+        bookSortField = field;
+        // For year, default first click to descending (newest first); for text, ascending (A-Z)
+        bookSortAsc = (field !== 'year');
+      }
+
+      resetBookSortIcons();
+      const activeIcon = document.getElementById('sortIcon_' + field);
+      if (activeIcon) {
+        activeIcon.textContent = bookSortAsc ? '↑' : '↓';
+        activeIcon.className = 'text-indigo-600 dark:text-indigo-400 font-extrabold';
+      }
+
+      currentBookResults.sort((a, b) => {
+        if (field === 'year') {
+          const yA = a.year_num || 0;
+          const yB = b.year_num || 0;
+          return bookSortAsc ? (yA - yB) : (yB - yA);
+        }
+        const valA = String(a[field] || '').toLowerCase().trim();
+        const valB = String(b[field] || '').toLowerCase().trim();
+        const cmp = valA.localeCompare(valB, currentLang, { numeric: true, sensitivity: 'base' });
+        return bookSortAsc ? cmp : -cmp;
+      });
+
+      renderBooksTable(currentBookResults, currentBookQuery);
+    }
+
     function clearBookSearch() {
       document.getElementById('bookQueryInput').value = '';
       document.getElementById('bookLangSelect').value = 'all';
@@ -1086,11 +1180,15 @@
       document.getElementById('bookYearTo').value = '';
       document.getElementById('bookExtSelect').value = 'all';
       currentBookResults = [];
+      currentBookPage = 1;
+      bookSortField = null;
+      resetBookSortIcons();
+      document.getElementById('bookPaginationBar').classList.add('hidden');
       document.getElementById('bookResultsCount').textContent = `0 ${t('books_found_plural')}`;
       document.getElementById('bookSearchStatus').textContent = t('books_waiting_status');
       document.getElementById('booksTableBody').innerHTML = `
         <tr>
-          <td colspan="5" class="px-6 py-14 text-center text-slate-400 dark:text-slate-500">
+          <td colspan="6" class="px-6 py-14 text-center text-slate-400 dark:text-slate-500">
             <div class="text-3xl mb-2">🏛️</div>
             <p class="font-medium">${t('books_empty_title')}</p>
             <p class="text-[11px] text-slate-400 dark:text-slate-600 mt-0.5">${t('books_empty_desc')}</p>
@@ -1099,12 +1197,23 @@
       `;
     }
 
-    async function searchBooks() {
+    function changeBookPage(delta) {
+      const nextPage = currentBookPage + delta;
+      if (nextPage < 1) return;
+      searchBooks(nextPage);
+    }
+
+    async function searchBooks(pageNum = 1) {
       const query = document.getElementById('bookQueryInput').value.trim();
       if (!query) {
         alert(t('alert_no_book_query'));
         return;
       }
+
+      currentBookQuery = query;
+      currentBookPage = pageNum;
+      bookSortField = null;
+      resetBookSortIcons();
 
       const lang = document.getElementById('bookLangSelect').value;
       const yearFrom = document.getElementById('bookYearFrom').value.trim();
@@ -1119,7 +1228,7 @@
       btn.classList.add('opacity-70', 'cursor-not-allowed');
       icon.textContent = '⏳';
       text.textContent = t('btn_searching_books');
-      document.getElementById('bookSearchStatus').textContent = `${t('btn_searching_books')} "${query}"...`;
+      document.getElementById('bookSearchStatus').textContent = `${t('btn_searching_books')} "${query}" (${t('page_label')} ${pageNum})...`;
 
       try {
         const res = await fetch('/api/books/search', {
@@ -1130,7 +1239,8 @@
             lang: lang,
             year_from: yearFrom,
             year_to: yearTo,
-            ext: ext
+            ext: ext,
+            page: pageNum
           })
         });
 
@@ -1138,6 +1248,17 @@
         const books = data.books || [];
         currentBookResults = books;
         renderBooksTable(books, query);
+
+        // Update pagination bar
+        const pagBar = document.getElementById('bookPaginationBar');
+        if (books.length > 0 || pageNum > 1) {
+          pagBar.classList.remove('hidden');
+          document.getElementById('bookCurrentPageNum').textContent = pageNum;
+          document.getElementById('btnPrevBookPage').disabled = (pageNum <= 1);
+          document.getElementById('btnNextBookPage').disabled = !data.has_more;
+        } else {
+          pagBar.classList.add('hidden');
+        }
       } catch (err) {
         alert("Error: " + err.message);
       } finally {
@@ -1152,13 +1273,13 @@
       const tbody = document.getElementById('booksTableBody');
       tbody.innerHTML = '';
 
-      document.getElementById('bookResultsCount').textContent = `${books.length} ${t('books_found_plural')}`;
+      document.getElementById('bookResultsCount').textContent = `${books.length} ${t('books_found_plural')} (${t('page_label')} ${currentBookPage})`;
       document.getElementById('bookSearchStatus').textContent = `${query} — ${books.length} ${t('books_found_plural')}`;
 
       if (!books || books.length === 0) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="5" class="px-6 py-12 text-center text-slate-400 dark:text-slate-500">
+            <td colspan="6" class="px-6 py-12 text-center text-slate-400 dark:text-slate-500">
               <div class="text-3xl mb-2">🔍</div>
               <p class="font-medium">${t('books_no_results')}</p>
             </td>
@@ -1182,13 +1303,15 @@
         const pubSpan = b.publisher ? `<span>${b.publisher}</span>` : '';
 
         tr.innerHTML = `
-          <td class="px-4 py-3 max-w-md">
+          <td class="px-4 py-3 max-w-xs">
             <div class="font-semibold text-slate-800 dark:text-slate-100 line-clamp-2" title="${b.title}">${b.title}</div>
-            <div class="text-[11px] text-indigo-600 dark:text-indigo-400 font-medium mt-0.5">${b.author}</div>
             <div class="text-[10px] text-slate-400 flex flex-wrap items-center gap-2 mt-0.5">
               ${pubSpan}
               ${isbnSpan}
             </div>
+          </td>
+          <td class="px-3 py-3 max-w-[180px]">
+            <div class="text-[11px] text-indigo-600 dark:text-indigo-400 font-medium line-clamp-2" title="${b.author}">${b.author || '-'}</div>
           </td>
           <td class="px-3 py-3 text-center font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap">${b.year || '-'}</td>
           <td class="px-3 py-3 text-center whitespace-nowrap">

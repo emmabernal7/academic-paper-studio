@@ -798,16 +798,21 @@ def generate_book_citations(book):
     return bib, ris, enw, cite_key
 
 
-def search_books_catalog(query, lang="all", year_from=None, year_to=None, ext="all", max_results=40):
+def search_books_catalog(query, lang="all", year_from=None, year_to=None, ext="all", page=1, max_results=100):
     """
     Search unified book catalog (Anna's Archive / Z-Library / LibGen MD5 index).
-    Supports filtering by language, year range (year_from..year_to), and file extension (pdf, epub, etc.).
+    Supports filtering by language, year range (year_from..year_to), file extension (pdf, epub, etc.), and pagination.
     """
     from urllib.parse import quote
     if not query or not query.strip():
         return {"success": False, "books": [], "error": "Empty query"}
 
     query_clean = query.strip()
+    try:
+        page_num = max(1, int(page or 1))
+    except ValueError:
+        page_num = 1
+
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
     }
@@ -839,7 +844,7 @@ def search_books_catalog(query, lang="all", year_from=None, year_to=None, ext="a
         search_url = (
             f"{mirror}/index.php?req={quote(query_clean)}"
             f"&columns[]=t&columns[]=a&columns[]=s&columns[]=y&columns[]=p&columns[]=i"
-            f"&objects[]=f&topics[]=l&topics[]=f&res=100"
+            f"&objects[]=f&topics[]=l&topics[]=f&res=100&page={page_num}"
         )
         try:
             r = requests.get(search_url, headers=headers, timeout=12)
@@ -1005,6 +1010,8 @@ def search_books_catalog(query, lang="all", year_from=None, year_to=None, ext="a
     return {
         "success": True,
         "query": query_clean,
+        "page": page_num,
+        "has_more": len(raw_books) >= 20,
         "total_found": len(filtered_books),
         "books": filtered_books
     }
