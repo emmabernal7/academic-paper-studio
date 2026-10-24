@@ -442,12 +442,14 @@
         </div>
 
         <!-- PAGINATION BAR FOR BOOKS CATALOG -->
-        <div id="bookPaginationBar" class="hidden px-5 py-3 bg-slate-50/70 dark:bg-slate-950/50 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs">
+        <div id="bookPaginationBar" class="hidden px-5 py-3 bg-slate-50/70 dark:bg-slate-950/50 border-t border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
           <button id="btnPrevBookPage" onclick="changeBookPage(-1)" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:border-indigo-500 font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed" data-i18n="btn_prev_page">
             ⬅️ Página Anterior
           </button>
-          <div class="font-semibold text-slate-600 dark:text-slate-300">
-            <span data-i18n="page_label">Página del catálogo</span> <span id="bookCurrentPageNum" class="px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-mono">1</span>
+          <div class="flex flex-wrap items-center gap-2 font-semibold text-slate-600 dark:text-slate-300">
+            <span data-i18n="page_label">Página</span>
+            <span id="bookCurrentPageNum" class="px-2.5 py-0.5 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 dark:text-indigo-400 font-mono font-bold">1 / 1</span>
+            <span id="bookTotalCatalogBadge" class="text-[11px] text-slate-400 dark:text-slate-400 font-normal"></span>
           </div>
           <button id="btnNextBookPage" onclick="changeBookPage(1)" class="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:border-indigo-500 font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed" data-i18n="btn_next_page">
             Página Siguiente ➡️
@@ -526,7 +528,9 @@
         th_book_format: "Formato / Tamaño",
         btn_prev_page: "⬅️ Página Anterior",
         btn_next_page: "Página Siguiente ➡️",
-        page_label: "Página del catálogo",
+        page_label: "Página",
+        total_in_catalog: "libros totales en catálogo",
+        showing_on_page: "mostrados en esta página",
         books_empty_title: "Buscador de Libros Anna's Archive / Z-Library",
         books_empty_desc: "Escribe el nombre del libro a la izquierda, ajusta el idioma o rango de años y presiona Buscar.",
         books_no_results: "No se encontraron libros con esos filtros. Intenta ampliar el rango de años o cambiar el idioma.",
@@ -623,7 +627,9 @@
         th_book_format: "Format / Size",
         btn_prev_page: "⬅️ Previous Page",
         btn_next_page: "Next Page ➡️",
-        page_label: "Catalog Page",
+        page_label: "Page",
+        total_in_catalog: "total books in catalog",
+        showing_on_page: "shown on this page",
         books_empty_title: "Anna's Archive / Z-Library Book Searcher",
         books_empty_desc: "Type the book name on the left, adjust language or year range, and click Search.",
         books_no_results: "No books found matching those filters. Try widening the year range or changing language.",
@@ -1098,6 +1104,8 @@
     let currentAppMode = 'papers';
     let currentBookResults = [];
     let currentBookPage = 1;
+    let currentBookTotalPages = 1;
+    let currentBookTotalCatalog = 0;
     let currentBookQuery = '';
     let bookSortField = null;
     let bookSortAsc = true;
@@ -1181,6 +1189,8 @@
       document.getElementById('bookExtSelect').value = 'all';
       currentBookResults = [];
       currentBookPage = 1;
+      currentBookTotalPages = 1;
+      currentBookTotalCatalog = 0;
       bookSortField = null;
       resetBookSortIcons();
       document.getElementById('bookPaginationBar').classList.add('hidden');
@@ -1199,7 +1209,7 @@
 
     function changeBookPage(delta) {
       const nextPage = currentBookPage + delta;
-      if (nextPage < 1) return;
+      if (nextPage < 1 || nextPage > currentBookTotalPages) return;
       searchBooks(nextPage);
     }
 
@@ -1247,15 +1257,18 @@
         const data = await res.json();
         const books = data.books || [];
         currentBookResults = books;
+        currentBookTotalPages = data.total_pages || 1;
+        currentBookTotalCatalog = data.total_catalog_results || books.length;
         renderBooksTable(books, query);
 
         // Update pagination bar
         const pagBar = document.getElementById('bookPaginationBar');
         if (books.length > 0 || pageNum > 1) {
           pagBar.classList.remove('hidden');
-          document.getElementById('bookCurrentPageNum').textContent = pageNum;
+          document.getElementById('bookCurrentPageNum').textContent = `${pageNum} / ${currentBookTotalPages}`;
+          document.getElementById('bookTotalCatalogBadge').textContent = `(${currentBookTotalCatalog} ${t('total_in_catalog')} · 25 / pág)`;
           document.getElementById('btnPrevBookPage').disabled = (pageNum <= 1);
-          document.getElementById('btnNextBookPage').disabled = !data.has_more;
+          document.getElementById('btnNextBookPage').disabled = (pageNum >= currentBookTotalPages);
         } else {
           pagBar.classList.add('hidden');
         }
@@ -1273,8 +1286,8 @@
       const tbody = document.getElementById('booksTableBody');
       tbody.innerHTML = '';
 
-      document.getElementById('bookResultsCount').textContent = `${books.length} ${t('books_found_plural')} (${t('page_label')} ${currentBookPage})`;
-      document.getElementById('bookSearchStatus').textContent = `${query} — ${books.length} ${t('books_found_plural')}`;
+      document.getElementById('bookResultsCount').textContent = `${books.length} ${t('showing_on_page')} · ${currentBookTotalCatalog} ${t('total_in_catalog')} (${t('page_label')} ${currentBookPage} / ${currentBookTotalPages})`;
+      document.getElementById('bookSearchStatus').textContent = `${query} — ${t('page_label')} ${currentBookPage} / ${currentBookTotalPages} (${currentBookTotalCatalog} ${t('books_found_plural')})`;
 
       if (!books || books.length === 0) {
         tbody.innerHTML = `

@@ -836,6 +836,8 @@ def search_books_catalog(query, lang="all", year_from=None, year_to=None, ext="a
 
     raw_books = []
     seen_md5 = set()
+    total_catalog_results = 0
+    total_pages = 1
 
     # 1. Primary Unified Catalog Search (LibGen / Anna's Archive MD5 Index)
     for mirror in LIBGEN_BOOK_MIRRORS:
@@ -850,6 +852,19 @@ def search_books_catalog(query, lang="all", year_from=None, year_to=None, ext="a
             r = requests.get(search_url, headers=headers, timeout=12)
             if r.status_code != 200:
                 continue
+
+            # Extract total catalog count (e.g. Files <span class="badge badge-primary">601</span>)
+            m_files = re.search(r'Files\s*<span[^>]*>(\d+)</span>', r.text, re.I)
+            if m_files:
+                total_catalog_results = int(m_files.group(1))
+
+            # Extract total pages from Paginator("paginator_example_top", total_pages, max_visible, current_page, ...)
+            m_pag = re.search(r'Paginator\(\s*["\']paginator_example_top["\']\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)', r.text)
+            if m_pag:
+                total_pages = max(1, int(m_pag.group(1)))
+            elif total_catalog_results > 0:
+                total_pages = max(1, (total_catalog_results + 24) // 25)
+
             soup = BeautifulSoup(r.text, "html.parser")
             table = soup.find("table", id="tablelibgen")
             if not table:
@@ -1007,11 +1022,17 @@ def search_books_catalog(query, lang="all", year_from=None, year_to=None, ext="a
         if len(filtered_books) >= max_results:
             break
 
+    if total_catalog_results == 0 and raw_books:
+        total_catalog_results = len(raw_books)
+
     return {
         "success": True,
         "query": query_clean,
         "page": page_num,
-        "has_more": len(raw_books) >= 20,
+        "total_pages": total_pages,
+        "per_page": 25,
+        "total_catalog_results": total_catalog_results,
+        "has_more": page_num < total_pages,
         "total_found": len(filtered_books),
         "books": filtered_books
     }
