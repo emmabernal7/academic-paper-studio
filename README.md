@@ -15,8 +15,16 @@
   6. **Sci-Hub Multi-Mirror Network**: Resilient fallback for paywalled pre-2021 literature.
   7. **Anna's Archive Engine (SciDB / Z-Library / LibGen / IPFS)**: Native fallback for post-2021 paywalled articles, book chapters, and scientific books.
 
+- **📚 Dual-Mode Research Suite (Papers & Books)**:
+  - **📄 Papers Mode (DOI Batch Downloader)**: Process dozens of DOIs simultaneously with real-time progress, PDF bundling, and citation generation.
+  - **📚 Book Downloader Mode (Anna's Archive / Z-Library / LibGen Unified Catalog)**:
+    - Search books by **Title, Author, Publisher, or ISBN**.
+    - Instant reactive filters by **Language** (Spanish, English, Portuguese, French, German, Italian), **Publication Year Range (`From–To`)**, and **File Format (`PDF`, `EPUB`, `DJVU`)**.
+    - Interactive **column sorting** (`Title & Publisher`, `Author`, `Year`, `Language`, `Format / Size`).
+    - Dynamic pagination with customizable items per page (**`10`, `25`, `50`, `100`, or `All`**), automatic `@book` citation generation (`.bib`, `.ris`, `.enw`), and 1-click direct book downloads.
+
 - **📑 Multi-Format Citation Generator**:
-  - Automatically generates `.bib` (BibTeX), `.ris` (EndNote / Mendeley / Zotero), and `.enw` (EndNote Web) files for each paper.
+  - Automatically generates `.bib` (BibTeX), `.ris` (EndNote / Mendeley / Zotero), and `.enw` (EndNote Web) files for both journal articles (`@article`) and books (`@book`).
   - Generates a summary `summary.csv` and bundles everything into an `AcademicPapers_Bundle.zip` with 1 click.
 
 - **🔄 Zotero Cloud Sync**:
