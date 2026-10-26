@@ -36,11 +36,18 @@ STATE_LOCK = threading.Lock()
 
 def progress_updater(current_idx, total, message, current_item=None):
     with STATE_LOCK:
-        STATE["current_index"] = current_idx + 1
+        STATE["current_index"] = min(current_idx + 1, total)
         STATE["total"] = total
         STATE["message"] = message
-        if current_item and not any(r["doi"] == current_item["doi"] for r in STATE["results"]):
-            STATE["results"].append(current_item)
+        if current_item:
+            found = False
+            for i, r in enumerate(STATE["results"]):
+                if r.get("doi") == current_item.get("doi"):
+                    STATE["results"][i] = current_item
+                    found = True
+                    break
+            if not found:
+                STATE["results"].append(current_item)
 
 def run_background_batch(dois, options):
     global STATE

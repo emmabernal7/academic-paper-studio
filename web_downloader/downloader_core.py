@@ -15,12 +15,16 @@ import zipfile
 from bs4 import BeautifulSoup
 
 SCI_HUB_DEFAULT_MIRRORS = [
+    "https://sci.bban.top",
+    "https://sci-hub.ren",
+    "https://sci-hub.wf",
     "https://sci-hub.ru",
     "https://sci-hub.st",
     "https://sci-hub.se"
 ]
 
 ANNAS_ARCHIVE_MIRRORS = [
+    "https://annas-archive.li",
     "https://annas-archive.gl",
     "https://annas-archive.org",
     "https://annas-archive.se"
@@ -245,36 +249,85 @@ def try_download_oa(oa_url, output_path):
     """Attempt download from open access URL."""
     return download_pdf_from_url(oa_url, output_path)
 
+def try_semantic_scholar(doi, output_path):
+    """
+    Query Semantic Scholar Open Access API.
+    Provides direct Open Access PDF URLs from publishers and institutional archives.
+    """
+    url = f"https://api.semanticscholar.org/graph/v1/paper/{doi}?fields=openAccessPdf"
+    try:
+        r = requests.get(url, timeout=6)
+        if r.status_code == 200:
+            pdf_info = r.json().get("openAccessPdf") or {}
+            pdf_url = pdf_info.get("url")
+            if pdf_url and download_pdf_from_url(pdf_url, output_path):
+                return {"success": True, "source": "Open Access (Semantic Scholar)"}
+    except Exception:
+        pass
+    return {"success": False}
+
 def try_download_scihub(doi, output_path, mirrors=None):
-    """Attempt download from active Sci-Hub mirrors."""
+    """
+    Attempt download from active Sci-Hub mirrors and high-speed direct CDN storage.
+    Supports direct storage nodes (sci.bban.top), active mirrors (.ren, .wf), and fallback mirrors.
+    """
+    if isinstance(mirrors, str):
+        mirrors = [mirrors]
     mirrors = mirrors or SCI_HUB_DEFAULT_MIRRORS
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml,application/pdf,*/*;q=0.9",
+        "Accept-Language": "en-US,en;q=0.9"
     }
 
+    # 1. Direct fast CDN check (sci.bban.top storage backend)
+    # This directly fetches the PDF in < 1.5 seconds without HTML scraping or captchas
+    direct_urls = [
+        f"https://sci.bban.top/pdf/{doi}.pdf",
+        f"https://sci.bban.top/pdf/{doi}"
+    ]
+    for d_url in direct_urls:
+        try:
+            r = requests.get(d_url, headers=headers, timeout=(4, 15), stream=True)
+            if r.status_code == 200:
+                chunk = next(r.iter_content(1024), b"")
+                if b"%PDF" in chunk or "application/pdf" in r.headers.get("Content-Type", "").lower():
+                    with open(output_path, "wb") as f:
+                        f.write(chunk)
+                        for block in r.iter_content(65536):
+                            f.write(block)
+                    if os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
+                        return {"success": True, "source": "Sci-Hub (Fast CDN: sci.bban.top)", "size": os.path.getsize(output_path)}
+        except Exception:
+            pass
+
+    # 2. Iterate HTML web mirrors (.ren, .wf, etc.)
     for mirror in mirrors:
         mirror = mirror.rstrip('/')
+        if "bban.top" in mirror:
+            continue
         url = f"{mirror}/{doi}"
         try:
-            r = requests.get(url, headers=headers, timeout=15)
+            r = requests.get(url, headers=headers, timeout=(4, 10))
             if r.status_code != 200:
+                continue
+            # Skip if blocked by ALTCHA or Cloudflare
+            if "altcha" in r.text.lower() or "ddos-guard" in r.text.lower():
                 continue
 
             soup = BeautifulSoup(r.text, "html.parser")
             pdf_url = None
 
-            # 1. Object with application/pdf
-            obj = soup.find("object", type="application/pdf")
-            if obj and obj.get("data"):
-                pdf_url = obj["data"]
+            # Check embed / iframe / object tags
+            for tag_name in ["embed", "iframe", "object"]:
+                el = soup.find(tag_name, id="pdf") or soup.find(tag_name, type="application/pdf") or soup.find(tag_name)
+                if el:
+                    src = el.get("src") or el.get("data")
+                    if src and any(k in src.lower() for k in [".pdf", "bban.top", "sci", "download"]):
+                        pdf_url = src
+                        break
 
-            # 2. Embed or iframe with id=pdf
-            if not pdf_url:
-                embed = soup.find("embed", id="pdf") or soup.find("iframe", id="pdf")
-                if embed and embed.get("src"):
-                    pdf_url = embed["src"]
-
-            # 3. Direct button onclick
+            # Check button onclick (location.href)
             if not pdf_url:
                 btn = soup.find("button", onclick=True)
                 if btn:
@@ -282,24 +335,21 @@ def try_download_scihub(doi, output_path, mirrors=None):
                     if m:
                         pdf_url = m.group(1)
 
-            # 4. Direct <a> tag containing .pdf
+            # Check direct <a> tag
             if not pdf_url:
-                a_tag = soup.find("a", href=lambda h: h and ".pdf" in h)
+                a_tag = soup.find("a", href=lambda h: h and ".pdf" in h.lower())
                 if a_tag:
                     pdf_url = a_tag["href"]
 
             if pdf_url:
+                pdf_url = pdf_url.split("#")[0]
                 if pdf_url.startswith("//"):
                     pdf_url = "https:" + pdf_url
                 elif pdf_url.startswith("/"):
                     pdf_url = mirror + pdf_url
 
-                # Stream and save PDF
-                pdf_resp = requests.get(pdf_url, headers=headers, timeout=30)
-                if pdf_resp.status_code == 200 and len(pdf_resp.content) > 1000:
-                    with open(output_path, "wb") as f:
-                        f.write(pdf_resp.content)
-                    return {"success": True, "source": mirror, "size": len(pdf_resp.content)}
+                if download_pdf_from_url(pdf_url, output_path, headers=headers):
+                    return {"success": True, "source": f"Sci-Hub ({mirror})", "size": os.path.getsize(output_path)}
         except Exception:
             continue
 
@@ -618,6 +668,13 @@ def process_batch(dois, options, progress_callback=None, output_dir="downloads")
                 downloaded = True
                 source_used = res_unpaywall["source"]
 
+        # Tier 2b: Semantic Scholar Open Access API
+        if not downloaded:
+            res_s2 = try_semantic_scholar(doi, pdf_path)
+            if res_s2.get("success"):
+                downloaded = True
+                source_used = res_s2["source"]
+
         # Tier 3: Publisher Landing Page (Highwire Press citation_pdf_url meta tag)
         if not downloaded:
             res_highwire = try_publisher_highwire(doi, pdf_path)
@@ -639,12 +696,12 @@ def process_batch(dois, options, progress_callback=None, output_dir="downloads")
                 downloaded = True
                 source_used = res_prep["source"]
 
-        # Tier 6: Sci-Hub Multi-Mirror (.ru, .st, .se)
+        # Tier 6: Sci-Hub Multi-Mirror & Direct CDN Storage
         if not downloaded:
             res_scihub = try_download_scihub(doi, pdf_path, mirrors=mirrors)
             if res_scihub.get("success"):
                 downloaded = True
-                source_used = f"Sci-Hub ({res_scihub.get('source', '')})"
+                source_used = res_scihub.get("source", "Sci-Hub")
 
         # Tier 7: Anna's Archive (SciDB / Z-Library / LibGen / IPFS)
         if not downloaded:
@@ -667,6 +724,9 @@ def process_batch(dois, options, progress_callback=None, output_dir="downloads")
         else:
             item_result["status"] = "not_found"
             item_result["source"] = "No disponible"
+
+        if progress_callback:
+            progress_callback(idx, total, f"Completado {doi} ({item_result['status']})", item_result)
 
         results.append(item_result)
         time.sleep(0.5)  # Politeness interval
