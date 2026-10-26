@@ -258,13 +258,29 @@ class AcademicStudioHandler(SimpleHTTPRequestHandler):
         self.send_error(404, "Endpoint not found")
 
 def start_server():
+    open_browser = "--open" in sys.argv
+    url = f"http://localhost:{PORT}"
     server_address = ("", PORT)
-    httpd = ThreadingHTTPServer(server_address, AcademicStudioHandler)
+    try:
+        httpd = ThreadingHTTPServer(server_address, AcademicStudioHandler)
+    except OSError:
+        print(f"\n=======================================================")
+        print(f" Academic Paper Studio ya está activo en {url}")
+        print(f" Abriendo el navegador...")
+        print(f"=======================================================\n")
+        if open_browser:
+            import webbrowser
+            webbrowser.open(url)
+        return
+
     print(f"\n=======================================================")
     print(f" Academic Paper Studio Server Activo")
-    print(f" URL Local: http://localhost:{PORT}")
+    print(f" URL Local: {url}")
     print(f" Presiona Ctrl + C en cualquier momento para detener")
     print(f"=======================================================\n")
+    if open_browser:
+        import webbrowser
+        threading.Timer(0.8, lambda: webbrowser.open(url)).start()
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
