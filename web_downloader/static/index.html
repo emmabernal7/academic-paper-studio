@@ -83,12 +83,12 @@
   <!-- MAIN CONTENT: PAPERS (DOI) MODE -->
   <main id="viewPapers" class="flex-1 max-w-[1600px] w-full mx-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
-    <!-- LEFT COLUMN: INPUTS & SETTINGS (5 Cols) -->
-    <div class="lg:col-span-5 space-y-5">
+    <!-- LEFT COLUMN: INPUTS & SETTINGS (4 Cols = 33.3%) -->
+    <div class="lg:col-span-4 space-y-4">
       
       <!-- CARD: DOI INPUT -->
-      <div class="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm dark:shadow-xl transition-colors">
-        <div class="flex items-center justify-between mb-3">
+      <div class="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm dark:shadow-xl transition-colors">
+        <div class="flex items-center justify-between mb-2.5">
           <div class="flex items-center space-x-2">
             <span class="text-indigo-500 text-lg">📄</span>
             <h2 class="text-sm font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200" data-i18n="doi_title">Lista de DOIs</h2>
@@ -106,12 +106,12 @@
 
         <p class="text-xs text-slate-500 dark:text-slate-400 mb-2" data-i18n="doi_instruction">Pega tus DOIs o URLs de artículos (uno por línea o separados por comas):</p>
         
-        <!-- TEXTAREA LIMPIO (SOLO: Escribe tu DOI aqui) -->
-        <textarea id="doiInput" rows="6" placeholder="Escribe tu DOI aqui" data-i18n-placeholder="doi_placeholder"
-          class="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 text-xs text-slate-800 dark:text-slate-200 font-mono focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition custom-scrollbar"></textarea>
+        <!-- TEXTAREA LIMPIO -->
+        <textarea id="doiInput" rows="5" placeholder="Escribe tu DOI aqui" data-i18n-placeholder="doi_placeholder"
+          class="w-full bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-xs text-slate-800 dark:text-slate-200 font-mono focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition custom-scrollbar"></textarea>
 
         <!-- Drag and Drop Box -->
-        <div id="dropZone" class="mt-3 border-2 border-dashed border-slate-200 dark:border-slate-800 hover:border-indigo-400 dark:hover:border-slate-700 rounded-xl p-3 text-center cursor-pointer transition bg-slate-50/50 dark:bg-slate-950/40">
+        <div id="dropZone" class="mt-2.5 border-2 border-dashed border-slate-200 dark:border-slate-800 hover:border-indigo-400 dark:hover:border-slate-700 rounded-xl p-2.5 text-center cursor-pointer transition bg-slate-50/50 dark:bg-slate-950/40">
           <input type="file" id="fileInput" accept=".txt,.csv" class="hidden" onchange="handleFileSelect(event)">
           <div onclick="document.getElementById('fileInput').click()" class="flex items-center justify-center space-x-2 text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
             <span>📁</span>
@@ -121,7 +121,7 @@
       </div>
 
       <!-- CARD: OPTIONS ACCORDION -->
-      <div class="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm dark:shadow-xl space-y-4 transition-colors">
+      <div class="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm dark:shadow-xl space-y-3.5 transition-colors">
         <div class="flex items-center space-x-2 pb-2 border-b border-slate-200 dark:border-slate-800">
           <span class="text-indigo-500 text-lg">⚙️</span>
           <h2 class="text-sm font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200" data-i18n="config_title">Configuración de Descarga</h2>
@@ -131,13 +131,13 @@
         <div>
           <label class="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5" data-i18n="pdf_format_label">Formato de nombre del PDF:</label>
           <div class="grid grid-cols-2 gap-2">
-            <label class="flex items-center space-x-2 bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl cursor-pointer hover:border-indigo-400 dark:hover:border-slate-700">
+            <label class="flex items-center space-x-2 bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 p-2 rounded-xl cursor-pointer hover:border-indigo-400 dark:hover:border-slate-700">
               <input type="radio" name="renameMode" value="readable" checked class="text-indigo-600 focus:ring-indigo-500">
-              <span class="text-xs text-slate-700 dark:text-slate-300" data-i18n="pdf_format_readable">Año_Autor_Título.pdf</span>
+              <span class="text-[11px] text-slate-700 dark:text-slate-300 leading-tight" data-i18n="pdf_format_readable">Año_Autor_Título.pdf</span>
             </label>
-            <label class="flex items-center space-x-2 bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl cursor-pointer hover:border-indigo-400 dark:hover:border-slate-700">
+            <label class="flex items-center space-x-2 bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 p-2 rounded-xl cursor-pointer hover:border-indigo-400 dark:hover:border-slate-700">
               <input type="radio" name="renameMode" value="doi" class="text-indigo-600 focus:ring-indigo-500">
-              <span class="text-xs text-slate-700 dark:text-slate-300" data-i18n="pdf_format_doi">DOI_Limpio.pdf</span>
+              <span class="text-[11px] text-slate-700 dark:text-slate-300 leading-tight" data-i18n="pdf_format_doi">DOI_Limpio.pdf</span>
             </label>
           </div>
         </div>
@@ -181,8 +181,8 @@
       </div>
     </div>
 
-    <!-- RIGHT COLUMN: RESULTS & PROGRESS (7 Cols) -->
-    <div class="lg:col-span-7 space-y-5">
+    <!-- RIGHT COLUMN: RESULTS & PROGRESS (8 Cols = 66.7%) -->
+    <div class="lg:col-span-8 space-y-5">
       
       <!-- STATS BAR -->
       <div class="grid grid-cols-4 gap-3">
@@ -264,14 +264,14 @@
 
         <div class="overflow-x-auto max-h-[550px] custom-scrollbar">
           <table class="w-full text-left text-xs">
-            <thead class="bg-slate-50 dark:bg-slate-950/80 text-slate-500 dark:text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800 sticky top-0">
+            <thead class="bg-slate-50 dark:bg-slate-950/80 text-slate-500 dark:text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800 sticky top-0 select-none">
               <tr>
-                <th class="px-4 py-3" data-i18n="th_status">Estado</th>
-                <th class="px-4 py-3" data-i18n="th_title">Título & Revista</th>
-                <th class="px-3 py-3 text-center" data-i18n="th_year">Año</th>
-                <th class="px-3 py-3 text-center" data-i18n="th_citations">Citas</th>
-                <th class="px-4 py-3" data-i18n="th_source">Fuente</th>
-                <th class="px-4 py-3 text-right" data-i18n="th_actions">Acciones</th>
+                <th class="px-3 py-3" data-i18n="th_status">Estado</th>
+                <th class="px-3 py-3" data-i18n="th_title">Título &amp; Revista</th>
+                <th class="px-2 py-3 text-center" data-i18n="th_year">Año</th>
+                <th class="px-2 py-3 text-center" data-i18n="th_citations">Citas</th>
+                <th class="px-3 py-3 text-center" data-i18n="th_actions">Acciones</th>
+                <th class="px-3 py-3 text-right" data-i18n="th_source">Fuente</th>
               </tr>
             </thead>
             <tbody id="resultsTableBody" class="divide-y divide-slate-200 dark:divide-slate-800/60">
@@ -1035,8 +1035,8 @@
         // Title and Journal
         const titleHtml = `
           <div>
-            <div class="font-semibold text-slate-800 dark:text-slate-100 line-clamp-1" title="${item.title}">${item.title || item.doi}</div>
-            <div class="text-[11px] text-slate-500 dark:text-slate-400 flex items-center space-x-2 mt-0.5">
+            <div class="font-semibold text-slate-800 dark:text-slate-100 line-clamp-1 text-xs" title="${item.title}">${item.title || item.doi}</div>
+            <div class="text-[11px] text-slate-500 dark:text-slate-400 flex flex-wrap items-center gap-1.5 mt-0.5">
               <span>${item.journal || t('unknown_journal')}</span>
               <span>•</span>
               <a href="https://doi.org/${item.doi}" target="_blank" class="text-indigo-600 dark:text-indigo-400 hover:underline font-mono">${item.doi}</a>
@@ -1052,11 +1052,11 @@
           </span>
         `;
 
-        // Actions
-        let actionsHtml = `<div class="flex items-center justify-end space-x-1.5">`;
+        // Actions (Centered, placed to the left of Fuente)
+        let actionsHtml = `<div class="flex items-center justify-center space-x-1.5">`;
         if (item.pdf_filename) {
           actionsHtml += `
-            <a href="/downloads/${encodeURIComponent(item.pdf_filename)}" target="_blank" class="px-2.5 py-1 bg-indigo-50 dark:bg-indigo-600/20 hover:bg-indigo-100 dark:hover:bg-indigo-600/40 text-indigo-700 dark:text-indigo-300 rounded-lg text-[11px] font-semibold border border-indigo-200 dark:border-indigo-500/30 transition flex items-center space-x-1">
+            <a href="/downloads/${encodeURIComponent(item.pdf_filename)}" target="_blank" class="px-2.5 py-1 bg-indigo-50 dark:bg-indigo-600/20 hover:bg-indigo-100 dark:hover:bg-indigo-600/40 text-indigo-700 dark:text-indigo-300 rounded-lg text-[11px] font-semibold border border-indigo-200 dark:border-indigo-500/30 transition flex items-center space-x-1" title="Descargar PDF">
               <span>⬇️</span><span>PDF</span>
             </a>
           `;
@@ -1069,12 +1069,12 @@
         actionsHtml += `</div>`;
 
         tr.innerHTML = `
-          <td class="px-4 py-3 whitespace-nowrap">${statusBadge}</td>
-          <td class="px-4 py-3 max-w-sm">${titleHtml}</td>
-          <td class="px-3 py-3 text-center font-mono text-slate-700 dark:text-slate-300">${item.year || '-'}</td>
-          <td class="px-3 py-3 text-center">${citesHtml}</td>
-          <td class="px-4 py-3 text-slate-500 dark:text-slate-400 text-[11px] whitespace-nowrap">${item.source || '-'}</td>
-          <td class="px-4 py-3 text-right whitespace-nowrap">${actionsHtml}</td>
+          <td class="px-3 py-3 whitespace-nowrap">${statusBadge}</td>
+          <td class="px-3 py-3 max-w-sm sm:max-w-md">${titleHtml}</td>
+          <td class="px-2 py-3 text-center font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap">${item.year || '-'}</td>
+          <td class="px-2 py-3 text-center whitespace-nowrap">${citesHtml}</td>
+          <td class="px-3 py-3 text-center whitespace-nowrap">${actionsHtml}</td>
+          <td class="px-3 py-3 text-right text-slate-500 dark:text-slate-400 text-[11px] whitespace-nowrap">${item.source || '-'}</td>
         `;
 
         tbody.appendChild(tr);
