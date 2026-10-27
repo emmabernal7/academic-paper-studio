@@ -167,6 +167,48 @@ class AcademicStudioHandler(SimpleHTTPRequestHandler):
                         self.wfile.write(f.read())
                 return
 
+        # 4. Favicon at root (/favicon.ico)
+        if path == "/favicon.ico":
+            ico_path = os.path.join(STATIC_DIR, "favicon.ico")
+            if os.path.exists(ico_path):
+                self.send_response(200)
+                self.send_header("Content-Type", "image/x-icon")
+                self.send_header("Content-Length", str(os.path.getsize(ico_path)))
+                self.end_headers()
+                if not head_only:
+                    with open(ico_path, "rb") as f:
+                        self.wfile.write(f.read())
+                return
+
+        # 5. Serve Static Assets (/static/*)
+        if path.startswith("/static/"):
+            rel_path = urllib.parse.unquote(path[len("/static/"):])
+            file_path = os.path.join(STATIC_DIR, rel_path)
+            if os.path.exists(file_path) and os.path.isfile(file_path):
+                self.send_response(200)
+                if file_path.endswith(".png"):
+                    self.send_header("Content-Type", "image/png")
+                elif file_path.endswith(".jpg") or file_path.endswith(".jpeg"):
+                    self.send_header("Content-Type", "image/jpeg")
+                elif file_path.endswith(".ico"):
+                    self.send_header("Content-Type", "image/x-icon")
+                elif file_path.endswith(".svg"):
+                    self.send_header("Content-Type", "image/svg+xml")
+                elif file_path.endswith(".css"):
+                    self.send_header("Content-Type", "text/css")
+                elif file_path.endswith(".js"):
+                    self.send_header("Content-Type", "application/javascript")
+                elif file_path.endswith(".html"):
+                    self.send_header("Content-Type", "text/html; charset=utf-8")
+                else:
+                    self.send_header("Content-Type", "application/octet-stream")
+                self.send_header("Content-Length", str(os.path.getsize(file_path)))
+                self.end_headers()
+                if not head_only:
+                    with open(file_path, "rb") as f:
+                        self.wfile.write(f.read())
+                return
+
         # Static assets fallback
         super().do_GET()
 
