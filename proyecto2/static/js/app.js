@@ -340,6 +340,8 @@ function renderProfiles() {
       scholar_id: s.scholar_id,
       scholar_url: s.profile_url,
       citations: s.citations,
+      h_index: s.h_index,
+      i10_index: s.i10_index,
       photo_url: s.photo_url,
       interests: s.interests,
       sources: ["Google Scholar"]
@@ -350,6 +352,7 @@ function renderProfiles() {
       affiliation: sc.affiliation,
       scopus_id: sc.scopus_id,
       scopus_url: sc.profile_url,
+      documents_count: sc.documents_count,
       interests: sc.subject_areas,
       sources: ["Scopus"]
     }));
@@ -385,11 +388,24 @@ function renderProfiles() {
     // Avatar
     const avatarHtml = p.photo_url 
       ? `<img src="${p.photo_url}" class="w-12 h-12 rounded-full object-cover border border-slate-300 dark:border-slate-700 flex-shrink-0" onerror="this.src='/static/favicon.png'">`
-      : `<div class="w-12 h-12 rounded-full bg-gradient-to-tr from-indigo-600 to-cyan-500 text-white font-bold text-base flex items-center justify-center flex-shrink-0 shadow">${p.name.charAt(0)}</div>`;
+      : `<div class="w-12 h-12 rounded-full bg-gradient-to-tr from-indigo-600 to-cyan-500 text-white font-bold text-base flex items-center justify-center flex-shrink-0 shadow">${escapeHtml(p.name ? p.name.charAt(0) : "A")}</div>`;
 
-    // Citations count
-    const citationsHtml = p.citations !== null && p.citations !== undefined 
-      ? `<div class="flex items-center gap-1 text-xs font-bold text-amber-500">⭐ ${p.citations.toLocaleString()} citas</div>`
+    // Metrics strip
+    const metricsHtml = [];
+    if (p.citations !== null && p.citations !== undefined) {
+      metricsHtml.push(`<span class="text-xs font-bold text-amber-500">⭐ ${p.citations.toLocaleString()} citas</span>`);
+    }
+    if (p.h_index) {
+      metricsHtml.push(`<span class="text-xs font-bold text-cyan-500">h-index: ${p.h_index}</span>`);
+    }
+    if (p.i10_index) {
+      metricsHtml.push(`<span class="text-xs font-semibold text-slate-400">i10: ${p.i10_index}</span>`);
+    }
+    if (p.documents_count) {
+      metricsHtml.push(`<span class="text-xs font-semibold text-indigo-400">${p.documents_count} docs</span>`);
+    }
+    const metricsRow = metricsHtml.length > 0 
+      ? `<div class="flex items-center gap-2.5 pt-0.5 flex-wrap">${metricsHtml.join('<span class="text-slate-600">•</span>')}</div>`
       : "";
 
     // Interests tags
@@ -408,6 +424,17 @@ function renderProfiles() {
           ${avatarHtml}
           <div class="flex-1 min-w-0">
             <h4 class="text-base font-bold text-slate-900 dark:text-white truncate">${escapeHtml(p.name)}</h4>
+            <p class="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">${escapeHtml(p.affiliation || "Investigador académico")}</p>
+            ${metricsRow}
+          </div>
+        </div>
+
+        <div class="flex flex-wrap gap-1.5">
+          ${badges.join("")}
+        </div>
+
+        ${interestsHtml}
+      </div>
             <p class="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">${escapeHtml(p.affiliation || "Investigador independiente")}</p>
             ${citationsHtml}
           </div>
